@@ -1032,7 +1032,7 @@ class AccountInvoiceElectronic(models.Model):
                         parent_id=False,
                     )
 
-                if not inv.sequence or not inv.sequence.isdigit():  # or (len(inv.number) == 10):
+                if not inv.sequence or (len(inv.number) < 20):
                     inv.state_tributacion = 'na'
                     _logger.info('E-INV CR - Ignored invoice:%s', inv.number)
                     continue
@@ -1041,7 +1041,6 @@ class AccountInvoiceElectronic(models.Model):
                               current_invoice, total_invoices, inv.number_electronic)
 
                 if not inv.xml_comprobante or (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
-
                     if inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado':
                         inv.message_post(
                             body='Se está enviando otra FEC porque la anterior fue rechazada por Hacienda. Adjuntos los XMLs anteriores. Clave anterior: ' + inv.number_electronic,
