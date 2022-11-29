@@ -424,6 +424,7 @@ class AccountInvoiceElectronic(models.Model):
     def get_invoice_sequence(self):
         tipo_documento = self.tipo_documento
         sequence = False
+        no_sequence_message = "This journal doesn't have the sequence configure for documents of type: " + tipo_documento + ". Please consider to configure the sequence and reset the invoice to draft."
 
         if self.move_type == 'out_invoice':
             # tipo de identificación
@@ -435,13 +436,37 @@ class AccountInvoiceElectronic(models.Model):
                 tipo_documento = 'TE'
                 self.tipo_documento = 'TE'
             if tipo_documento == 'FE':
-                sequence = self.journal_id.FE_sequence_id.next_by_id()
+                if self.journal_id.FE_sequence_id:
+                    sequence = self.journal_id.FE_sequence_id.next_by_id()
+                else:
+                    self.state_tributacion = "na"
+                    self.message_post(
+                        subject=_('Warning'),
+                        body=no_sequence_message)
             elif tipo_documento == 'TE':
-                sequence = self.journal_id.TE_sequence_id.next_by_id()
+                if self.journal_id.TE_sequence_id:
+                    sequence = self.journal_id.TE_sequence_id.next_by_id()
+                else:
+                    self.state_tributacion = "na"
+                    self.message_post(
+                        subject=_('Warning'),
+                        body=no_sequence_message)
             elif tipo_documento == 'ND':
-                sequence = self.journal_id.ND_sequence_id.next_by_id()
+                if self.journal_id.ND_sequence_id:
+                    sequence = self.journal_id.ND_sequence_id.next_by_id()
+                else:
+                    self.state_tributacion = "na"
+                    self.message_post(
+                        subject=_('Warning'),
+                        body=no_sequence_message)
             elif tipo_documento == 'FEE':
-                sequence = self.journal_id.FEE_sequence_id.next_by_id()
+                if self.journal_id.FEE_sequence_id:
+                    sequence = self.journal_id.FEE_sequence_id.next_by_id()
+                else:
+                    self.state_tributacion = "na"
+                    self.message_post(
+                        subject=_('Warning'),
+                        body=no_sequence_message)
             else:
                 raise UserError('Tipo documento "%s" es inválido para una factura', tipo_documento)
 
@@ -838,7 +863,7 @@ class AccountInvoiceElectronic(models.Model):
 
                                         self.message_post(
                                             body=message_description,
-                                            subtype_xmlid='mail.mt_note',
+                                            subtype='mail.mt_note',
                                             content_subtype='html')
 
                                         _logger.info(_(f'E-INV CR - Document Status:{inv.state_tributacion}'))
@@ -1384,15 +1409,15 @@ class AccountInvoiceElectronic(models.Model):
                     vals['tipo_documento'] = 'TE'
         return super().create(vals_list)
 
-    def _post(self, soft=True):
+    def action_post(self):
         # Revisamos si el ambiente para Hacienda está habilitado
         for inv in self:
             if inv.company_id.frm_ws_ambiente == 'disabled':
-                super()._post(soft)
+                super().action_post()
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.tipo_documento == 'disabled':
-                super()._post(soft)
+                super().action_post()
                 continue
 
             if inv.partner_id.has_exoneration and inv.partner_id.date_expiration and \
@@ -1455,7 +1480,7 @@ class AccountInvoiceElectronic(models.Model):
                 if tipo_documento and sequence:
                     inv.tipo_documento = tipo_documento
                 else:
-                    super()._post(soft)
+                    super().action_post()
                     continue
 
             # Calcular si aplica IVA Devuelto
@@ -1481,7 +1506,7 @@ class AccountInvoiceElectronic(models.Model):
                         'quantity': 1,
                     })
 
-            super()._post(soft)
+            super().action_post()
             if not inv.number_electronic:
                 # if journal doesn't have sucursal use default from company
                 sucursal_id = inv.journal_id.sucursal or self.env.user.company_id.sucursal_MR
