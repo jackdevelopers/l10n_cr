@@ -1388,6 +1388,8 @@ class AccountInvoiceElectronic(models.Model):
             company = company_id and self.env['res.company'].browse(company_id)
             if not vals.get('payment_methods_id') and partner and partner.payment_methods_id:
                 vals['payment_methods_id'] = partner.payment_methods_id.id
+            elif not vals.get('payment_methods_id') and partner and not partner.payment_methods_id:
+                vals['payment_methods_id'] = 1
             if not vals.get('economic_activity_id'):
                 if move_type in ('in_invoice', 'in_refund') and partner_id:
                     vals['economic_activity_id'] = partner.activity_id.id
@@ -1409,15 +1411,15 @@ class AccountInvoiceElectronic(models.Model):
                     vals['tipo_documento'] = 'TE'
         return super().create(vals_list)
 
-    def action_post(self):
+    def _post(self, soft=False):
         # Revisamos si el ambiente para Hacienda está habilitado
         for inv in self:
             if inv.company_id.frm_ws_ambiente == 'disabled':
-                super().action_post()
+                super()._post(soft)
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.tipo_documento == 'disabled':
-                super().action_post()
+                super()._post(soft)
                 continue
 
             if inv.partner_id.has_exoneration and inv.partner_id.date_expiration and \
@@ -1480,7 +1482,7 @@ class AccountInvoiceElectronic(models.Model):
                 if tipo_documento and sequence:
                     inv.tipo_documento = tipo_documento
                 else:
-                    super().action_post()
+                    super()._post(soft)
                     continue
 
             # Calcular si aplica IVA Devuelto
@@ -1506,7 +1508,7 @@ class AccountInvoiceElectronic(models.Model):
                         'quantity': 1,
                     })
 
-            super().action_post()
+            super()._post(soft)
             if not inv.number_electronic:
                 # if journal doesn't have sucursal use default from company
                 sucursal_id = inv.journal_id.sucursal or self.env.user.company_id.sucursal_MR
