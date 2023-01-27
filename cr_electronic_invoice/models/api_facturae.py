@@ -338,7 +338,7 @@ def gen_xml_mr_43(clave, cedula_emisor, fecha_emision, id_mensaje,
 
     return str(sb)
 
-def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
+def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
                 total_servicio_exento, totalServExonerado,
                 total_mercaderia_gravado, total_mercaderia_exento,
                 totalMercExonerada, totalOtrosCargos, total_iva_devuelto, base_total,
@@ -385,7 +385,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     sb.append('xsi:schemaLocation="' + fe_enums.schemaLocation[inv.tipo_documento] + '">')
 
     sb.append('<Clave>' + inv.number_electronic + '</Clave>')
-    sb.append('<CodigoActividad>' + inv.economic_activity_id.code + '</CodigoActividad>')
+    sb.append('<CodigoActividad>' + activity + '</CodigoActividad>')
     sb.append('<NumeroConsecutivo>' + inv.number_electronic[21:41] + '</NumeroConsecutivo>')
     sb.append('<FechaEmision>' + inv.date_issuance + '</FechaEmision>')
     sb.append('<Emisor>')

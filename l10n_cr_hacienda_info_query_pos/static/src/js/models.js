@@ -46,16 +46,6 @@ function(require) {
         }
     ],{'before': 'res.country.state'});
 
-    models.load_models([
-        {
-            model: 'identification.type',
-            fields: ['name','code'],
-            loaded: function(self, identifications){
-                self.identifications = identifications;
-            },
-        }
-    ],{'before': 'res.vat'});
-
     return models;
 
 });

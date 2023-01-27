@@ -86,48 +86,6 @@ class PosOrder(models.Model):
     _name = "pos.order"
     _inherit = ["pos.order", "mail.thread"]
 
-    def action_invoice_sent(self):
-        email_template = self.env.ref(
-            'cr_electronic_invoice_pos.email_template_pos_invoice', False)
-        attachment = self.env['ir.attachment'].search([
-            ('res_model', '=', 'pos.order'),
-            ('res_id', '=', self.id),
-            ('res_field', '=', 'xml_comprobante')
-            ], limit=1)
-        attachment.name = self.fname_xml_comprobante
-        # attachment.datas_fname = self.fname_xml_comprobante
-        attachment_resp = self.env['ir.attachment'].search([
-            ('res_model', '=', 'pos.order'),
-            ('res_id', '=', self.id),
-            ('res_field', '=', 'xml_respuesta_tributacion')
-            ], limit=1)
-        attachment_resp.name = self.fname_xml_respuesta_tributacion
-        # attachment_resp.datas_fname = self.fname_xml_respuesta_tributacion
-        email_template.attachment_ids = [
-            (6, 0, [attachment.id, attachment_resp.id])]
-        email_template.with_context(
-            type='binary',
-            default_type='binary').send_mail(self.id, raise_exception=False, force_send=True)
-        email_template.attachment_ids = [(5)]
-
-    def sequence_number_sync(self, vals):
-        tipo_documento = vals.get('tipo_documento', False)
-        sequence = vals.get('sequence', False)
-        sequence = int(sequence) if sequence else False
-        if vals.get('session_id') and sequence:
-            session = self.env['pos.session'].sudo().browse(vals['session_id'])
-            if tipo_documento == 'FE' and sequence >= session.config_id.FE_sequence_id.number_next_actual:
-                session.config_id.FE_sequence_id.number_next_actual = sequence + 1
-            elif tipo_documento == 'TE' and sequence >= session.config_id.TE_sequence_id.number_next_actual:
-                session.config_id.TE_sequence_id.number_next_actual = sequence + 1
-
-    def _order_fields(self, ui_order):
-        vals = super()._order_fields(ui_order)
-        vals['tipo_documento'] = ui_order.get('tipo_documento')
-        vals['sequence'] = ui_order.get('sequence')
-        vals['number_electronic'] = ui_order.get('number_electronic')
-        return vals
-
     number_electronic = fields.Char(
         string="Electronic Number", copy=False, index=True)
     date_issuance = fields.Char(
@@ -178,6 +136,49 @@ class PosOrder(models.Model):
     _sql_constraints = [
         ('number_electronic_uniq', 'unique (number_electronic)', "La clave de comprobante debe ser única"),
     ]
+
+    def action_invoice_sent(self):
+        email_template = self.env.ref(
+            'cr_electronic_invoice_pos.email_template_pos_invoice', False)
+        attachment = self.env['ir.attachment'].search([
+            ('res_model', '=', 'pos.order'),
+            ('res_id', '=', self.id),
+            ('res_field', '=', 'xml_comprobante')
+        ], limit=1)
+        attachment.name = self.fname_xml_comprobante
+        # attachment.datas_fname = self.fname_xml_comprobante
+        attachment_resp = self.env['ir.attachment'].search([
+            ('res_model', '=', 'pos.order'),
+            ('res_id', '=', self.id),
+            ('res_field', '=', 'xml_respuesta_tributacion')
+        ], limit=1)
+        attachment_resp.name = self.fname_xml_respuesta_tributacion
+        # attachment_resp.datas_fname = self.fname_xml_respuesta_tributacion
+        email_template.attachment_ids = [
+            (6, 0, [attachment.id, attachment_resp.id])]
+        email_template.with_context(
+            type='binary',
+            default_type='binary').send_mail(self.id, raise_exception=False, force_send=True)
+        email_template.attachment_ids = [(5)]
+
+    def sequence_number_sync(self, vals):
+        tipo_documento = vals.get('tipo_documento', False)
+        sequence = vals.get('sequence', False)
+        sequence = int(sequence) if sequence else False
+        if vals.get('session_id') and sequence:
+            session = self.env['pos.session'].sudo().browse(vals['session_id'])
+            if tipo_documento == 'FE' and sequence >= session.config_id.FE_sequence_id.number_next_actual:
+                session.config_id.FE_sequence_id.number_next_actual = sequence + 1
+            elif tipo_documento == 'TE' and sequence >= session.config_id.TE_sequence_id.number_next_actual:
+                session.config_id.TE_sequence_id.number_next_actual = sequence + 1
+
+    @api.model
+    def _order_fields(self, ui_order):
+        vals = super()._order_fields(ui_order)
+        vals['tipo_documento'] = ui_order.get('tipo_documento')
+        vals['sequence'] = ui_order.get('sequence')
+        vals['number_electronic'] = ui_order.get('number_electronic')
+        return vals
 
     @api.model
     def create(self, vals):

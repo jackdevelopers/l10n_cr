@@ -1012,6 +1012,11 @@ class AccountInvoiceElectronic(models.Model):
                     mes = inv.number_electronic[5:7]  # '%02d' % now_cr.month,
                     anno = inv.number_electronic[7:9]  # str(now_cr.year)[2:4],
 
+                    if inv.economic_activity_id.code:
+                        activity = inv.economic_activity_id.code
+                    else:
+                        activity = self.env.user.company_id.activity_id.code
+
                     date_cr = now_cr.strftime("20" + anno + "-" + mes + "-" + dia + "T%H:%M:%S-06:00")
 
                     inv.date_issuance = date_cr
@@ -1300,7 +1305,7 @@ class AccountInvoiceElectronic(models.Model):
                     total_descuento = round(total_descuento, 5)
                     # ESTE METODO GENERA EL XML DIRECTAMENTE DESDE PYTHON
                     xml_string_builder = api_facturae.gen_xml_v43(
-                        inv, sale_conditions, total_servicio_gravado,
+                        inv, activity, sale_conditions, total_servicio_gravado,
                         total_servicio_exento, total_servicio_exonerado,
                         total_mercaderia_gravado, total_mercaderia_exento,
                         total_mercaderia_exonerado, total_otros_cargos, total_iva_devuelto, base_subtotal,

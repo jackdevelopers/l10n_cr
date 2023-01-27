@@ -25,7 +25,6 @@ odoo.define('cr_electronic_invoice_pos.models', function (require) {
     var ajax = require('web.ajax');
     var core = require('web.core');
     var models = require('point_of_sale.models');
-
     var _sequence_next = function(seq){
         var idict = {
             'year': moment().format('YYYY'),
@@ -60,6 +59,7 @@ odoo.define('cr_electronic_invoice_pos.models', function (require) {
     models.PosModel = models.PosModel.extend({
         load_server_data: function(){
             var self = this;
+            console.log(self.models);
             // Load POS sequence object
             self.models.push({
                 model: 'ir.sequence',
@@ -67,12 +67,14 @@ odoo.define('cr_electronic_invoice_pos.models', function (require) {
                 ids:    function(self){ 
                     return [
                         self.config.FE_sequence_id[0],
-                        self.config.TE_sequence_id[0]
+                        self.config.TE_sequence_id[0],
+                        self.config.NC_sequence_id[0]
                     ]; 
                 },
                 loaded: function(self, sequence){
                     self.FE_sequence = sequence[0];
                     self.TE_sequence = sequence[1];
+                    self.NC_sequence = sequence[2];
                 },
             });
             return PosModelParent.load_server_data.call(this, arguments);
@@ -80,14 +82,21 @@ odoo.define('cr_electronic_invoice_pos.models', function (require) {
         push_single_order: function (order, opts) {
             opts = opts || {};
             const self = this;
-            if (order.get_client() && order.get_client().vat) {
+            console.log('Push single order');
+            console.log(order);
+            console.log(self);
+            if (order.get_client() && order.get_client().vat && order.total_paid > 0 ) {
                 order.set_sequence(self.FE_sequence.number_next_actual);
                 order.set_number_electronic(_sequence_next(self.FE_sequence));
                 order.set_tipo_documento('FE');
-            } else {
+            } else if (order.total_paid > 0) {
                 order.set_sequence(self.TE_sequence.number_next_actual);
                 order.set_number_electronic(_sequence_next(self.TE_sequence));
                 order.set_tipo_documento('TE');
+            } else{
+                order.set_sequence(self.NC_sequence.number_next_actual);
+                order.set_number_electronic(_sequence_next(self.NC_sequence));
+                order.set_tipo_documento('NC');
             }
             const order_id = self.db.add_order(order.export_as_JSON());
     
@@ -113,6 +122,7 @@ odoo.define('cr_electronic_invoice_pos.models', function (require) {
          * tipo_documento: Stores the doc type
          */
          initialize: function(attr,options){
+
             _super.prototype.initialize.call(this, attr, options);
 
             // Initialize the variables
@@ -136,6 +146,9 @@ odoo.define('cr_electronic_invoice_pos.models', function (require) {
         },
         export_as_JSON: function () {
             var json = _super.prototype.export_as_JSON.call(this, arguments);
+            console.log(json);
+            console.log(this.number_electronic);
+            console.log(this.get_number_electronic());
             if (this.sequence && this.number_electronic && this.tipo_documento) {
                 json.sequence = this.get_sequence();
                 json.number_electronic = this.get_number_electronic();
