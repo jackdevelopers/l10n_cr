@@ -10,10 +10,6 @@
 </template>
 <template id="stock_account.stock_account_report_invoice_document" inherit_id="account.report_invoice_document">
 </template>
-<template id="pos_sale.report_invoice_document" inherit_id="account.report_invoice_document">
-</template>
-<template id="point_of_sale.report_invoice_document" inherit_id="account.report_invoice_document">
-</template>
 
 <template id="account.report_invoice_document">
     <div class="article" t-att-data-oe-model="o and o._name" t-att-data-oe-id="o and o.id" t-att-data-oe-lang="o and o.env.context.get('lang')">
