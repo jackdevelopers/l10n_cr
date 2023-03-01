@@ -15,6 +15,7 @@ class ResCurrency(models.Model):
     _inherit = 'res.currency'
 
     rate = fields.Float(digits='Currency Rate Precision')
+    factor = fields.Float(str="Factor de Conversion Empresa")
 
     # -------------------------------------------------------------------------
     # CRON

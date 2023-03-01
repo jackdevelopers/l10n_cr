@@ -12,6 +12,9 @@
                     <button class="oe_stat_button" string="Update" type="object" icon="fa-refresh" name="action_create_missing_exchange_rates" attrs="{'invisible': [('active', '=', False)]}"/>
                 </div>
             </xpath>
+            <field name="currency_subunit_label" position="after">
+                    <field name="factor"/>
+            </field>
         </field>
     </record>
 </odoo>

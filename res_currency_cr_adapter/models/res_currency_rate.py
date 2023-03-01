@@ -286,17 +286,23 @@ class ResCurrencyRate(models.Model):
 
                 if response.status_code in (200,):
                     # Save the exchange rate in database
+                    factor = self.env.ref('base.USD').factor
                     today = datetime.now().strftime('%Y-%m-%d')
                     data = response.json()
                     vals = {}
-                    vals['original_rate'] = data['dolar']['venta']['valor']
+                    rate = data['dolar']['venta']['valor']
+                    rate = rate+ (rate*(factor/100))
+                    vals['original_rate'] = rate
                     vals['inverse_company_rate'] = data['dolar']['venta']['valor']
 
                     # Odoo utiliza un valor inverso,
                     # a cuantos dólares equivale 1 colón, por eso se divide 1 / tipo de cambio.
 
                     vals['rate'] = 1 / vals['original_rate']
-                    vals['original_rate_2'] = data['dolar']['compra']['valor']
+
+                    rate2 = data['dolar']['compra']['valor']
+                    rate2 = rate2 + (rate2 * (factor / 100))
+                    vals['original_rate_2'] = rate2
                     # vals['inverse_company_rate_2'] = data['dolar']['compra']['valor']
                     vals['rate_2'] = 1 / vals['original_rate_2']
                     vals['currency_id'] = self.env.ref('base.USD').id
