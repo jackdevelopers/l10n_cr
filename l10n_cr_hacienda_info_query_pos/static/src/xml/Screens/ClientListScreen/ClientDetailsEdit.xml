@@ -22,13 +22,13 @@
                     <span class="label">District</span>
                     <select class="detail client-address-states needsclick" name="district_id" t-on-change="captureChange">
                         <option value="">None</option>
-                         <t t-foreach="env.pos.districts" t-as="district" t-key="district.id">
-                             <option t-if="props.partner.county_id[0] == district.county_id[0]"
-                                            t-att-value="district.id"
-                                            t-att-selected="props.partner.district_id ? ((district.id === props.partner.district_id[0]) ? true : undefined) : undefined">
-                                        <t t-esc="district.name" />
-                                    </option>
-                         </t>
+<!--                         <t t-foreach="env.pos.districts" t-as="district" t-key="district.id">-->
+<!--                             <option t-if="props.partner.county_id[0] == district.county_id[0]"-->
+<!--                                            t-att-value="district.id"-->
+<!--                                            t-att-selected="props.partner.district_id ? ((district.id === props.partner.district_id[0]) ? true : undefined) : undefined">-->
+<!--                                        <t t-esc="district.name" />-->
+<!--                                    </option>-->
+<!--                         </t>-->
                     </select>
                 </div>
 
@@ -36,13 +36,13 @@
                     <span class="label">County</span>
                     <select class="detail client-address-states needsclick" name="county_id" t-on-change="onchange_county">
                         <option value="">None</option>
-                            <t t-foreach="env.pos.counties" t-as="county" t-key="county.id">
-                                <option t-if="props.partner.state_id[0] == county.state_id[0]"
-                                        t-att-value="county.id"
-                                        t-att-selected="props.partner.county_id ? ((county.id === props.partner.county_id[0]) ? true : undefined) : undefined">
-                                    <t t-esc="county.name" />
-                                </option>
-                            </t>
+<!--                            <t t-foreach="env.pos.counties" t-as="county" t-key="county.id">-->
+<!--                                <option t-if="props.partner.state_id[0] == county.state_id[0]"-->
+<!--                                        t-att-value="county.id"-->
+<!--                                        t-att-selected="props.partner.county_id ? ((county.id === props.partner.county_id[0]) ? true : undefined) : undefined">-->
+<!--                                    <t t-esc="county.name" />-->
+<!--                                </option>-->
+<!--                            </t>-->
                     </select>
                 </div>
 

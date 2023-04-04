@@ -1212,7 +1212,10 @@ class AccountInvoiceElectronic(models.Model):
 
                                     elif taxes_lookup[i['id']]['tax_code'] != '00':
                                         tax_index += 1
-                                        tax_amount = round(subtotal_line * taxes_lookup[i['id']]['tarifa'] / 100, 5)
+                                        if inv_line.discount == 100:
+                                            tax_amount = round(descuento * taxes_lookup[i['id']]['tarifa'] / 100, 5)
+                                        else:
+                                            tax_amount = round(subtotal_line * taxes_lookup[i['id']]['tarifa'] / 100, 5)
                                         _line_tax += tax_amount
                                         tax = {
                                             'codigo': taxes_lookup[i['id']]['tax_code'],
