@@ -67,6 +67,18 @@ class AccountInvoiceElectronic(models.Model):
         help='Indicates the type of document according to the classification of the Ministerio de Hacienda'
     )
 
+    tipo_documento_aceptacion = fields.Selection(
+        selection=[
+            ('CCE', 'MR Aceptación'),
+            ('CPCE', 'MR Aceptación Parcial'),
+            ('RCE', 'MR Rechazo'),
+            ('disabled', 'Electronic Documents Disabled')
+        ],
+        string="Voucher Type MR",
+        default='CCE',
+        help='Indicates the type of document according to the classification of the Ministerio de Hacienda'
+    )
+
     # === Answers fields === #
 
     state_send_invoice = fields.Selection(
@@ -794,7 +806,7 @@ class AccountInvoiceElectronic(models.Model):
                                                                      'res_name': inv.fname_xml_comprobante,
                                                                      'mimetype': 'text/xml'})
                             # inv.xml_comprobante = base64.b64encode(xml_firmado)
-                            inv.tipo_documento = tipo_documento
+                            inv.tipo_documento_aceptacion = tipo_documento
 
                             if inv.state_tributacion != 'procesando':
 

@@ -2349,6 +2349,11 @@ msgid "Voucher Type"
 msgstr "Tipo de Comprobante"
 
 #. module: cr_electronic_invoice
+#: model:ir.model.fields,field_description:cr_electronic_invoice.field_account_move__tipo_documento_aceptacion
+msgid "Voucher Type MR"
+msgstr "Tipo de Comprobante Aceptacion"
+
+#. module: cr_electronic_invoice
 #: code:addons/cr_electronic_invoice/models/account_move.py:0
 #, python-format
 msgid ""
