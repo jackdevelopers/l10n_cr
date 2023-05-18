@@ -866,7 +866,7 @@ class AccountInvoiceElectronic(models.Model):
 
                                         self.message_post(
                                             body=message_description,
-                                            subtype='mail.mt_note',
+                                            subtype_xmlid='mail.mt_note',
                                             content_subtype='html')
 
                                         _logger.info(_(f'E-INV CR - Document Status:{inv.state_tributacion}'))
@@ -1212,10 +1212,7 @@ class AccountInvoiceElectronic(models.Model):
 
                                     elif taxes_lookup[i['id']]['tax_code'] != '00':
                                         tax_index += 1
-                                        if inv_line.discount == 100:
-                                            tax_amount = round(descuento * taxes_lookup[i['id']]['tarifa'] / 100, 5)
-                                        else:
-                                            tax_amount = round(subtotal_line * taxes_lookup[i['id']]['tarifa'] / 100, 5)
+                                        tax_amount = round(subtotal_line * taxes_lookup[i['id']]['tarifa'] / 100, 5)
                                         _line_tax += tax_amount
                                         tax = {
                                             'codigo': taxes_lookup[i['id']]['tax_code'],
