@@ -646,7 +646,10 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
     if invoice_comments or invoice_ref:
         sb.append('<Otros>')
         if invoice_comments:
-            sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
+            if receiver_company.vat == '3101025849':
+                sb.append('<OtroTexto codigo="OC">' + str(invoice_comments) + '</OtroTexto>')
+            else:
+                sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
         if invoice_ref:
             sb.append('<OtroContenido>')
             sb.append('<InformacionAdicional xmlns="https://FE-CR/DataInfo.xsd">')
