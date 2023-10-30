@@ -345,7 +345,7 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
                 total_impuestos, total_descuento, lines,
                 otrosCargos, currency_rate, invoice_comments,
                 tipo_documento_referencia, numero_documento_referencia,
-                fecha_emision_referencia, codigo_referencia, razon_referencia):
+                fecha_emision_referencia, codigo_referencia, razon_referencia, order_number='0', gln_number='0'):
 
     numero_linea = 0
     payment_methods_id = []
@@ -648,6 +648,13 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
         if invoice_comments:
             if receiver_company.vat == '3101025849':
                 sb.append('<OtroTexto codigo="OC">' + str(invoice_comments) + '</OtroTexto>')
+            elif receiver_company.vat == '3101077742':
+                sb.append('<OtroContenido>')
+                sb.append('<CompraEntrega xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org/esquemas/CompraEntrega/">')
+                sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
+                sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
+                sb.append('</CompraEntrega>')
+                sb.append('</OtroContenido>')
             else:
                 sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
         if invoice_ref:
