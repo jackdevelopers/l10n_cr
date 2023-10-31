@@ -252,8 +252,9 @@ class AccountInvoiceElectronic(models.Model):
         readonly=True
     )
 
-    order_number = fields.Char(string= "Numero de Orden")
-    gln_number = fields.Char(string= "Numero GLN")
+    order_number = fields.Char(string="Numero de Orden")
+    gln_number = fields.Char(string="Numero GLN")
+
     _sql_constraints = [
         (
             "number_electronic_uniq",
@@ -1226,7 +1227,10 @@ class AccountInvoiceElectronic(models.Model):
 
                                     elif taxes_lookup[i['id']]['tax_code'] != '00':
                                         tax_index += 1
-                                        tax_amount = round(subtotal_line * taxes_lookup[i['id']]['tarifa'] / 100, 5)
+                                        if inv_line.discount == 100:
+                                            tax_amount = round(descuento * taxes_lookup[i['id']]['tarifa'] / 100, 5)
+                                        else:
+                                            tax_amount = round(subtotal_line * taxes_lookup[i['id']]['tarifa'] / 100, 5)
                                         _line_tax += tax_amount
                                         tax = {
                                             'codigo': taxes_lookup[i['id']]['tax_code'],
@@ -1342,7 +1346,7 @@ class AccountInvoiceElectronic(models.Model):
                         total_impuestos, total_descuento, lines,
                         otros_cargos, currency_rate, invoice_comments,
                         tipo_documento_referencia, numero_documento_referencia,
-                        fecha_emision_referencia, codigo_referencia, razon_referencia, inv.order_number, inv.gln_number)
+                        fecha_emision_referencia, codigo_referencia, razon_referencia, inv.order_number,inv.gln_number)
 
                     xml_to_sign = str(xml_string_builder)
                     xml_firmado = api_facturae.sign_xml(
