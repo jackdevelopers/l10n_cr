@@ -1566,7 +1566,8 @@ class AccountInvoiceElectronic(models.Model):
                 inv.number_electronic = response_json.get('clave')
                 inv.sequence = response_json.get('consecutivo')
 
-            inv.name = inv.sequence
+            if inv.move_type in ('out_invoice', 'out_refund'):
+                inv.name = inv.sequence
             inv.state_tributacion = False
 
     def _reverse_move_vals(self, default_values, cancel=True):
