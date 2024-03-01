@@ -1086,10 +1086,15 @@ class AccountInvoiceElectronic(models.Model):
                         sale_conditions = '01'
 
                     # Validate if invoice currency is the same as the company currency
-                    if currency.name == self.company_id.currency_id.name:
+                    if currency.name == 'CRC':
                         currency_rate = 1
                     else:
-                        currency_rate = round(1.0 / currency.rate, 5)
+                        if self.company_id.currency_id.name == currency.name:
+                            currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
+                            currency_rate = currency_obj.rate
+                        else:
+                            currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
+                            currency_rate = round(1.0 / currency_obj.rate, 5)
 
                     # Generamos las líneas de la factura
                     lines = dict([])
@@ -1290,7 +1295,7 @@ class AccountInvoiceElectronic(models.Model):
                                     total_mercaderia_exento += base_line
 
                             base_subtotal += subtotal_line
-
+                            print(subtotal_line)
                             line["montoTotalLinea"] = round(subtotal_line + _line_tax, 5)
 
                             lines[line_number] = line
