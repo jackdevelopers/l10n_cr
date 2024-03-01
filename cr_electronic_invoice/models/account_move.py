@@ -1091,7 +1091,7 @@ class AccountInvoiceElectronic(models.Model):
                     else:
                         if self.company_id.currency_id.name == currency.name:
                             currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
-                            currency_rate = currency_obj.rate
+                            currency_rate = round(currency_obj.rate,5)
                         else:
                             currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
                             currency_rate = round(1.0 / currency_obj.rate, 5)
