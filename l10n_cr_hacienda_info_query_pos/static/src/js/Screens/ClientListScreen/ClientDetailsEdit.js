@@ -80,8 +80,8 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
 
                 this.changes[event.target.name] = event.target.value;
             }
-
             obtener_nombre(event) {
+                console.log("Hola");
                 let vat = event.target.value
                 let host = window.location.host
                 let protocol = window.location.protocol
@@ -94,7 +94,6 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
 
             }
             saveChanges() {
-
                 const processedChanges = {};
                 for (const [key, value] of Object.entries(this.changes)) {
                     if (this.intFields.includes(key)) {
@@ -103,28 +102,17 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                         processedChanges[key] = value;
                     }
                 }
-                console.log(processedChanges);
-                console.log(this.props.partner);
                 this.props.partner.country_id = processedChanges.country_id
                 this.props.partner.state_id = processedChanges.state_id;
                 this.props.partner.county_id = processedChanges.county_id;
                 this.props.partner.district_id = processedChanges.district_id;
                 this.props.partner.identification_id = processedChanges.identification_id;
-
                 super.saveChanges();
             }
             captureChange(event) {
-
-                this.props.partner.country_id = event.currentTarget.country_id;
-                this.props.partner.state_id = event.currentTarget.state_id;
-                this.props.partner.county_id = event.currentTarget.county_id;
-                this.props.partner.district_id = event.currentTarget.district_id;
-                this.props.partner.identification_id = event.currentTarget.identification_id;
                 super.captureChange(event);
             }
         };
-
     Registries.Component.extend(ClientDetailsEdit, PosClientDetailsEdit);
-
     return ClientDetailsEdit;
 });
