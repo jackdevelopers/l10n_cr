@@ -79,28 +79,7 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
 
                 this.changes[event.target.name] = event.target.value;
             }
-            saveChanges() {
-                const processedChanges = {};
-                for (const [key, value] of Object.entries(this.changes)) {
-                    if (this.intFields.includes(key)) {
-                        processedChanges[key] = parseInt(value) || false;
-                    } else {
-                        processedChanges[key] = value;
-                    }
-                }
-                this.props.partner.country_id = processedChanges.country_id
-                this.props.partner.state_id = processedChanges.state_id;
-                this.props.partner.county_id = processedChanges.county_id;
-                this.props.partner.district_id = processedChanges.district_id;
-                this.props.partner.identification_id = processedChanges.identification_id;
-                super.saveChanges();
-            }
-            captureChange(event) {
-                var vat = document.getElementsByName("vat");
-                vat.forEach(element => {element.addEventListener("change", this.ObtenerNombre.bind(this));});
-                super.captureChange(event);
-            }
-            ObtenerNombre() {
+            obtener_nombre(event) {
                 let vat = this.changes.vat;
                 let partner_found = false;
                 for (let partner in this.env.pos.db.partner_by_id) {
@@ -127,6 +106,8 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                           console.log('The request returned a 404 status code.');
                         } else {
                             let result = httpGet(endpoint);
+                            let vatInput = document.querySelector('input[name="name"]');
+                            vatInput.value = result['nombre'];
                             this.changes[event.target.name] = event.target.value;
                             this.changes['name'] = result['nombre'];
                         }
@@ -136,6 +117,28 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                       });
                 }
             }
+            saveChanges() {
+                const processedChanges = {};
+                for (const [key, value] of Object.entries(this.changes)) {
+                    if (this.intFields.includes(key)) {
+                        processedChanges[key] = parseInt(value) || false;
+                    } else {
+                        processedChanges[key] = value;
+                    }
+                }
+                this.props.partner.country_id = processedChanges.country_id
+                this.props.partner.state_id = processedChanges.state_id;
+                this.props.partner.county_id = processedChanges.county_id;
+                this.props.partner.district_id = processedChanges.district_id;
+                this.props.partner.identification_id = processedChanges.identification_id;
+                super.saveChanges();
+            }
+            captureChange(event) {
+                var vat = document.getElementsByName("vat");
+                vat.forEach(element => {element.addEventListener("change", () => this.obtener_nombre(event));});
+                super.captureChange(event);
+            }
+
         };
     Registries.Component.extend(ClientDetailsEdit, PosClientDetailsEdit);
     return ClientDetailsEdit;
