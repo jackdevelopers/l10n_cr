@@ -57,5 +57,5 @@ class ProductElectronic(models.Model):
     @api.constrains('default_code')
     def _check_default_code_length(self):
         for record in self:
-            if len(record.default_code) > 20:  # Cambia 20 al máximo de longitud deseado
+            if record.default_code and len(record.default_code) > 20:  # Cambia 20 al máximo de longitud deseado
                 raise ValidationError('El código por defecto debe tener como máximo 20 caracteres.')
