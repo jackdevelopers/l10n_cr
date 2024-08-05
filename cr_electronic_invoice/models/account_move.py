@@ -67,6 +67,18 @@ class AccountInvoiceElectronic(models.Model):
         help='Indicates the type of document according to the classification of the Ministerio de Hacienda'
     )
 
+    tipo_documento_aceptacion = fields.Selection(
+        selection=[
+            ('CCE', 'MR Aceptación'),
+            ('CPCE', 'MR Aceptación Parcial'),
+            ('RCE', 'MR Rechazo'),
+            ('disabled', 'Electronic Documents Disabled')
+        ],
+        string="Voucher Type MR",
+        default='CCE',
+        help='Indicates the type of document according to the classification of the Ministerio de Hacienda'
+    )
+
     # === Answers fields === #
 
     state_send_invoice = fields.Selection(
@@ -239,6 +251,9 @@ class AccountInvoiceElectronic(models.Model):
         string='Original Invoice Date not loaded',
         readonly=True
     )
+
+    order_number = fields.Char(string="Numero de Orden")
+    gln_number = fields.Char(string="Numero GLN")
 
     _sql_constraints = [
         (
@@ -794,7 +809,7 @@ class AccountInvoiceElectronic(models.Model):
                                                                      'res_name': inv.fname_xml_comprobante,
                                                                      'mimetype': 'text/xml'})
                             # inv.xml_comprobante = base64.b64encode(xml_firmado)
-                            inv.tipo_documento = tipo_documento
+                            inv.tipo_documento_aceptacion = tipo_documento
 
                             if inv.state_tributacion != 'procesando':
 
@@ -866,7 +881,7 @@ class AccountInvoiceElectronic(models.Model):
 
                                         self.message_post(
                                             body=message_description,
-                                            subtype='mail.mt_note',
+                                            subtype_xmlid='mail.mt_note',
                                             content_subtype='html')
 
                                         _logger.info(_(f'E-INV CR - Document Status:{inv.state_tributacion}'))
@@ -1071,10 +1086,15 @@ class AccountInvoiceElectronic(models.Model):
                         sale_conditions = '01'
 
                     # Validate if invoice currency is the same as the company currency
-                    if currency.name == self.company_id.currency_id.name:
+                    if currency.name == 'CRC':
                         currency_rate = 1
                     else:
-                        currency_rate = round(1.0 / currency.rate, 5)
+                        if self.company_id.currency_id.name == currency.name:
+                            currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
+                            currency_rate = round(currency_obj.rate,5)
+                        else:
+                            currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
+                            currency_rate = round(1.0 / currency_obj.rate, 5)
 
                     # Generamos las líneas de la factura
                     lines = dict([])
@@ -1275,7 +1295,7 @@ class AccountInvoiceElectronic(models.Model):
                                     total_mercaderia_exento += base_line
 
                             base_subtotal += subtotal_line
-
+                            print(subtotal_line)
                             line["montoTotalLinea"] = round(subtotal_line + _line_tax, 5)
 
                             lines[line_number] = line
@@ -1331,7 +1351,7 @@ class AccountInvoiceElectronic(models.Model):
                         total_impuestos, total_descuento, lines,
                         otros_cargos, currency_rate, invoice_comments,
                         tipo_documento_referencia, numero_documento_referencia,
-                        fecha_emision_referencia, codigo_referencia, razon_referencia)
+                        fecha_emision_referencia, codigo_referencia, razon_referencia, inv.order_number,inv.gln_number)
 
                     xml_to_sign = str(xml_string_builder)
                     xml_firmado = api_facturae.sign_xml(
@@ -1551,7 +1571,8 @@ class AccountInvoiceElectronic(models.Model):
                 inv.number_electronic = response_json.get('clave')
                 inv.sequence = response_json.get('consecutivo')
 
-            inv.name = inv.sequence
+            if inv.move_type in ('out_invoice', 'out_refund'):
+                inv.name = inv.sequence
             inv.state_tributacion = False
 
     def _reverse_move_vals(self, default_values, cancel=True):

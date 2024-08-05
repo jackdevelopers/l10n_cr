@@ -21,7 +21,8 @@
     ],
     'assets': {
         'point_of_sale.assets': [
-            'cr_electronic_invoice_pos/static/src/js/models.js'
+            'cr_electronic_invoice_pos/static/src/js/models.js',
+            'cr_electronic_invoice_pos/static/src/js/PaymentScreenWidget.js'
         ],
         'web.assets_qweb': [
             'cr_electronic_invoice_pos/static/src/xml/**/*'

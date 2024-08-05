@@ -345,7 +345,7 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
                 total_impuestos, total_descuento, lines,
                 otrosCargos, currency_rate, invoice_comments,
                 tipo_documento_referencia, numero_documento_referencia,
-                fecha_emision_referencia, codigo_referencia, razon_referencia):
+                fecha_emision_referencia, codigo_referencia, razon_referencia, order_number='0', gln_number='0'):
 
     numero_linea = 0
     payment_methods_id = []
@@ -643,10 +643,21 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
         sb.append('<Codigo>' + str(codigo_referencia) + '</Codigo>')
         sb.append('<Razon>' + str(razon_referencia) + '</Razon>')
         sb.append('</InformacionReferencia>')
-    if invoice_comments or invoice_ref:
+    if invoice_comments or invoice_ref or order_number:
         sb.append('<Otros>')
         if invoice_comments:
-            sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
+            if receiver_company.vat == '3101025849':
+                sb.append('<OtroTexto codigo="OC">' + str(invoice_comments) + '</OtroTexto>')
+            else:
+                sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
+        if order_number:
+            sb.append('<OtroContenido>')
+            sb.append(
+                '<CompraEntrega xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org/esquemas/CompraEntrega/">')
+            sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
+            sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
+            sb.append('</CompraEntrega>')
+            sb.append('</OtroContenido>')
         if invoice_ref:
             sb.append('<OtroContenido>')
             sb.append('<InformacionAdicional xmlns="https://FE-CR/DataInfo.xsd">')

@@ -54,6 +54,12 @@
                 <field name="payment_methods_id" attrs="{'readonly':[('state','!=','draft')],'invisible':[('move_type','not in', ('out_invoice', 'out_refund','in_invoice', 'in_refund'))],'required':[('move_type','in', ('out_invoice', 'out_refund','in_invoice', 'in_refund'))]}"/>
             </field>
 
+            <xpath expr="//div[@name='journal_div']" position="after">
+                <field name="company_vat" invisible="1"/>
+                <field name="order_number" attrs="{'invisible':[('company_vat','!=','3101077742')]}"/>
+                <field name="gln_number" attrs="{'invisible':[('company_vat','!=','3101077742')]}"/>
+            </xpath>
+
            <xpath expr="//field[@name='invoice_line_ids']//tree//field[@name='name']" position="after">
                 <field name="categ_name" invisible="1" readonly="1"/>
                 <field name="product_code" invisible="1" readonly="1"/>
@@ -109,6 +115,7 @@
                                 <field name="xml_respuesta_tributacion" filename="fname_xml_respuesta_tributacion"/>
                                 <field name="state_tributacion" readonly="1"/>
                                 <field name="electronic_invoice_return_message" readonly="1"/>
+                                <field name="tipo_documento_aceptacion" attrs="{'readonly':True,'invisible':[('move_type','not in', ('in_invoice', 'in_refund'))]}"/>
                             </group>
                         </group>
 

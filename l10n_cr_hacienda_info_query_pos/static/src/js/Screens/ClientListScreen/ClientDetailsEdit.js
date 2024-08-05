@@ -28,7 +28,6 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
 
             onchange_state(event) {
                 let district_id = document.getElementsByName("district_id")[0];
-                // Reseteamos los otros combobox para que no se genere confusión
                 let str_html = "";
                 district_id.innerHTML = str_html;
 
@@ -80,21 +79,45 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
 
                 this.changes[event.target.name] = event.target.value;
             }
-
             obtener_nombre(event) {
-                let vat = event.target.value
-                let host = window.location.host
-                let protocol = window.location.protocol
-                let end_point = protocol + "//" + host + "/cedula/" + vat
-                let result = httpGet(end_point);
-                this.changes[event.target.name] = event.target.value;
-
-                this.changes['name'] = result['nombre'];
-                this.changes['email'] = result['email'];
-
+                let vat = this.changes.vat;
+                let partner_found = false;
+                for (let partner in this.env.pos.db.partner_by_id) {
+                    if (this.env.pos.db.partner_by_id[partner].vat === vat) {
+                        partner_found = true;
+                        this.showPopup('ErrorPopup',{
+                                                    'title': this.env._t('Cliente ya registrado'),
+                                                    'body': this.env._t('Ya se encuentra un cliente con cedula: '+ vat),});
+                        setTimeout(() => {
+                            let vatInput = document.querySelector('input[name="vat"]');
+                            if (vatInput) {
+                                vatInput.value = '';
+                            }
+                        }, 0);
+                        break;
+                    }
+                }
+                if (!partner_found){
+                    let host = "https://api.hacienda.go.cr/fe/ae?"
+                    let endpoint = host + "identificacion=" + vat
+                    fetch(endpoint)
+                      .then(response => {
+                        if (response.status === 404) {
+                          console.log('The request returned a 404 status code.');
+                        } else {
+                            let result = httpGet(endpoint);
+                            let vatInput = document.querySelector('input[name="name"]');
+                            vatInput.value = result['nombre'];
+                            this.changes[event.target.name] = event.target.value;
+                            this.changes['name'] = result['nombre'];
+                        }
+                      })
+                      .catch(error => {
+                        console.error('Error:', error);
+                      });
+                }
             }
             saveChanges() {
-
                 const processedChanges = {};
                 for (const [key, value] of Object.entries(this.changes)) {
                     if (this.intFields.includes(key)) {
@@ -103,28 +126,20 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                         processedChanges[key] = value;
                     }
                 }
-                console.log(processedChanges);
-                console.log(this.props.partner);
                 this.props.partner.country_id = processedChanges.country_id
                 this.props.partner.state_id = processedChanges.state_id;
                 this.props.partner.county_id = processedChanges.county_id;
                 this.props.partner.district_id = processedChanges.district_id;
                 this.props.partner.identification_id = processedChanges.identification_id;
-
                 super.saveChanges();
             }
             captureChange(event) {
-
-                this.props.partner.country_id = event.currentTarget.country_id;
-                this.props.partner.state_id = event.currentTarget.state_id;
-                this.props.partner.county_id = event.currentTarget.county_id;
-                this.props.partner.district_id = event.currentTarget.district_id;
-                this.props.partner.identification_id = event.currentTarget.identification_id;
+                var vat = document.getElementsByName("vat");
+                vat.forEach(element => {element.addEventListener("change", () => this.obtener_nombre(event));});
                 super.captureChange(event);
             }
+
         };
-
     Registries.Component.extend(ClientDetailsEdit, PosClientDetailsEdit);
-
     return ClientDetailsEdit;
 });
