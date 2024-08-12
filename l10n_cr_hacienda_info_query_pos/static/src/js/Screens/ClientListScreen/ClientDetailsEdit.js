@@ -93,7 +93,6 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                 select.innerHTML = str_html;
                 this.changes[event.target.name] = event.target.value;
             }
-
             obtener_nombre(event) {
                 let vat = this.changes.vat;
                 let partner_found = false;
@@ -150,7 +149,7 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                         processedChanges[key] = value;
                     }
                 }
-                this.props.partner.country_id = processedChanges.country_id;
+                this.props.partner.country_id = processedChanges.country_id
                 this.props.partner.state_id = processedChanges.state_id;
                 this.props.partner.county_id = processedChanges.county_id;
                 this.props.partner.district_id = processedChanges.district_id;
