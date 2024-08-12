@@ -3,7 +3,6 @@ function(require) {
     "use strict";
 
     const models = require("point_of_sale.models");
-
     models.load_fields('res.partner', ['county_id', 'district_id','identification_id']);
 
     var existing_models = models.PosModel.prototype.models;
@@ -11,7 +10,6 @@ function(require) {
         return model.model === "res.partner";
     });
     var partner_model = existing_models[partner_index];
-
     models.load_models([{
         model:  partner_model.model,
         fields: partner_model.fields,
