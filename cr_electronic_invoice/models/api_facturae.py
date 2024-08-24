@@ -858,7 +858,8 @@ def get_economic_activities(company):
     endpoint = "https://api.hacienda.go.cr/fe/ae?identificacion=" + company.vat
 
     headers = {'Cache-Control': 'no-cache',
-               'Content-Type': 'application/x-www-form-urlencoded'}
+               'Content-Type': 'application/x-www-form-urlencoded',
+               'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
 
     try:
         response = requests.get(endpoint, headers=headers, verify=False)
