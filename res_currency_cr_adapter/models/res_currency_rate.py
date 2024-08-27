@@ -283,7 +283,15 @@ class ResCurrencyRate(models.Model):
 
                 try:
                     url = 'https://api.hacienda.go.cr/indicadores/tc/dolar/historico/?d='+initial_date+'&h='+end_date
-                    response = requests.get(url, timeout=5, verify=False)
+                    headers = {'Content-Type': 'application/json',
+                               'Content-Type': 'application/x-www-form-urlencoded',
+                               'Sec-Fetch-Dest': 'iframe',
+                               'Sec-Fetch-User': '?1',
+                               'Sec-Fetch-Mode': 'navigate',
+                               'Sec-Fetch-Site': 'same-origin',
+                               'Accept-Language': 'en-US,en;q=0.9',
+                               'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
+                    response = requests.get(url ,headers=headers, verify=False)
 
                 except requests.exceptions.RequestException as e:
                     _logger.error('RequestException %s', e)
@@ -318,7 +326,15 @@ class ResCurrencyRate(models.Model):
             else:
                 try:
                     url = 'https://api.hacienda.go.cr/indicadores/tc'
-                    response = requests.get(url, timeout=5, verify=False)
+                    headers = {'Content-Type': 'application/json',
+                               'Content-Type': 'application/x-www-form-urlencoded',
+                               'Sec-Fetch-Dest': 'iframe',
+                               'Sec-Fetch-User': '?1',
+                               'Sec-Fetch-Mode': 'navigate',
+                               'Sec-Fetch-Site': 'same-origin',
+                               'Accept-Language': 'en-US,en;q=0.9',
+                               'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
+                    response = requests.get(url, headers=headers, verify=False)
 
                 except requests.exceptions.RequestException as e:
                     _logger.error('RequestException %s', e)
