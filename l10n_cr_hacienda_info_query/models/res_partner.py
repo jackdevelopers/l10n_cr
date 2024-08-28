@@ -59,8 +59,14 @@ class ResPartner(models.Model):
 
             end_point = url_base + 'identificacion=' + cedula
 
-            headers = {'content-type': 'application/json',
-                       'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36' }
+            headers = {'Content-Type': 'application/json',
+                       'Content-Type': 'application/x-www-form-urlencoded',
+                       'Sec-Fetch-Dest': 'iframe',
+                       'Sec-Fetch-User': '?1',
+                       'Sec-Fetch-Mode': 'navigate',
+                       'Sec-Fetch-Site': 'same-origin',
+                       'Accept-Language': 'en-US,en;q=0.9',
+                       'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
             try:
                 peticion = requests.get(end_point, headers=headers, timeout=10)
 
