@@ -13,9 +13,7 @@
                     <!-- here goes header buttons -->
                 </div>
             </div>
-
             <div class="pos-content">
-
                 <div class='window'>
                     <div class='subwindow'>
                         <div class='subwindow-container'>
@@ -25,14 +23,11 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="placeholder-OnscreenKeyboardWidget"></div>
             </div>
-
             <div class='popups'>
                 <!-- here go the popups -->
             </div>
-
             <div class="loader">
                 <div class='loader-feedback oe_hidden'>
                     <h1 class='message'>Loading</h1>
@@ -44,7 +39,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </t>
 
@@ -233,7 +227,6 @@
                             </div>
                         </div>
                     </div>
-
                     <div class='subwindow collapsed'>
                         <div class='subwindow-container'>
                             <div class='subwindow-container-fix pads'>
@@ -243,7 +236,6 @@
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
             <div class="rightpane">
@@ -254,7 +246,6 @@
                             <span class="placeholder-ProductCategoriesWidget" />
                         </td>
                     </tr>
-
                     <tr class="content-row">
                         <td class="content-cell">
                             <div class="content-container">
@@ -262,7 +253,6 @@
                             </div>
                         </td>
                     </tr>
-
                 </table>
             </div>
         </div>
@@ -521,7 +511,6 @@
                 </div>
             </div>
         </t>
-
         <t t-if="paymentlines.length">
             <table class='paymentlines'>
                 <colgroup>
