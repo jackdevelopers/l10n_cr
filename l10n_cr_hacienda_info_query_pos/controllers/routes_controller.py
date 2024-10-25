@@ -52,7 +52,7 @@ class ActualizarPosApi(http.Controller):
             if url_base[-1:] == '/':
                 url_base = url_base[:-1]
 
-           end_point = url_base + "identificacion=" + cedula
+            end_point = url_base + "identificacion=" + cedula
 
             url_chrome = "https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/all/versions"
             response_chrome_version = requests.get(url_chrome)
