@@ -857,17 +857,29 @@ def consulta_clave(clave, token, tipo_ambiente):
 def get_economic_activities(company):
     endpoint = "https://api.hacienda.go.cr/fe/ae?identificacion=" + company.vat
 
-    headers = {'Content-Type': 'application/json',
-               'Content-Type': 'application/x-www-form-urlencoded',
-               'Sec-Fetch-Dest': 'iframe',
-               'Sec-Fetch-User': '?1',
-               'Sec-Fetch-Mode' : 'navigate',
-               'Sec-Fetch-Site' : 'same-origin',
-               'Accept-Language' : 'en-US,en;q=0.9',
-               'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
-
+    url_chrome = "https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/all/versions"
+    response_chrome_version = requests.get(url_chrome)
+    data = response_chrome_version.json()
+    latest_version = data['versions'][0]['version']
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3",
+        "Connection": "keep-alive",
+        "Host": "api.hacienda.go.cr",
+        "Priority": "u=0, i",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Sec-GPC": "1",
+        "Upgrade-Insecure-Requests": "1",
+        "User-Agent": f"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{latest_version} Safari/537.36"
+    }
+    response = requests.get(endpoint, headers=headers)
+    cookies = response.cookies
     try:
-        response = requests.get(endpoint, headers=headers, verify=False)
+        response = requests.get(endpoint, headers=headers, cookies=cookies, timeout=5)
     except requests.exceptions.RequestException as e:
         _logger.error('Exception %s', e)
         return {'status': -1, 'text': 'Excepcion %s' % e}

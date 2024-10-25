@@ -282,16 +282,29 @@ class ResCurrencyRate(models.Model):
                 end_date = last_date.strftime('%Y-%m-%d')
 
                 try:
-                    url = 'https://api.hacienda.go.cr/indicadores/tc/dolar/historico/?d='+initial_date+'&h='+end_date
-                    headers = {'Content-Type': 'application/json',
-                               'Content-Type': 'application/x-www-form-urlencoded',
-                               'Sec-Fetch-Dest': 'iframe',
-                               'Sec-Fetch-User': '?1',
-                               'Sec-Fetch-Mode': 'navigate',
-                               'Sec-Fetch-Site': 'same-origin',
-                               'Accept-Language': 'en-US,en;q=0.9',
-                               'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
-                    response = requests.get(url ,headers=headers, verify=False)
+                    url_chrome = "https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/all/versions"
+                    response_chrome_version = requests.get(url_chrome)
+                    data = response_chrome_version.json()
+                    latest_version = data['versions'][0]['version']
+                    url_dgtd = 'https://api.hacienda.go.cr/indicadores/tc/dolar/historico/?d='+initial_date+'&h='+end_date
+                    headers = {
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+                        "Accept-Encoding": "gzip, deflate, br, zstd",
+                        "Accept-Language": "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3",
+                        "Connection": "keep-alive",
+                        "Host": "api.hacienda.go.cr",
+                        "Priority": "u=0, i",
+                        "Sec-Fetch-Dest": "document",
+                        "Sec-Fetch-Mode": "navigate",
+                        "Sec-Fetch-Site": "none",
+                        "Sec-Fetch-User": "?1",
+                        "Sec-GPC": "1",
+                        "Upgrade-Insecure-Requests": "1",
+                        "User-Agent": f"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{latest_version} Safari/537.36"
+                    }
+                    response = requests.get(url_dgtd, headers=headers)
+                    cookies = response.cookies
+                    response = requests.get(url_dgtd, headers=headers, cookies=cookies, timeout=5)
 
                 except requests.exceptions.RequestException as e:
                     _logger.error('RequestException %s', e)
@@ -325,16 +338,29 @@ class ResCurrencyRate(models.Model):
                                 self.sudo().create(vals)
             else:
                 try:
-                    url = 'https://api.hacienda.go.cr/indicadores/tc'
-                    headers = {'Content-Type': 'application/json',
-                               'Content-Type': 'application/x-www-form-urlencoded',
-                               'Sec-Fetch-Dest': 'iframe',
-                               'Sec-Fetch-User': '?1',
-                               'Sec-Fetch-Mode': 'navigate',
-                               'Sec-Fetch-Site': 'same-origin',
-                               'Accept-Language': 'en-US,en;q=0.9',
-                               'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36'}
-                    response = requests.get(url, headers=headers, verify=False)
+                    url_chrome = "https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/all/versions"
+                    response_chrome_version = requests.get(url_chrome)
+                    data = response_chrome_version.json()
+                    latest_version = data['versions'][0]['version']
+                    url_dgtd = 'https://api.hacienda.go.cr/indicadores/tc'
+                    headers = {
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
+                        "Accept-Encoding": "gzip, deflate, br, zstd",
+                        "Accept-Language": "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3",
+                        "Connection": "keep-alive",
+                        "Host": "api.hacienda.go.cr",
+                        "Priority": "u=0, i",
+                        "Sec-Fetch-Dest": "document",
+                        "Sec-Fetch-Mode": "navigate",
+                        "Sec-Fetch-Site": "none",
+                        "Sec-Fetch-User": "?1",
+                        "Sec-GPC": "1",
+                        "Upgrade-Insecure-Requests": "1",
+                        "User-Agent": f"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{latest_version} Safari/537.36"
+                    }
+                    response = requests.get(url_dgtd, headers=headers)
+                    cookies = response.cookies
+                    response = requests.get(url_dgtd, headers=headers, cookies=cookies, timeout=5)
 
                 except requests.exceptions.RequestException as e:
                     _logger.error('RequestException %s', e)
