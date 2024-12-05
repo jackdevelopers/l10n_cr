@@ -39,6 +39,14 @@ class InvoiceLineElectronic(models.Model):
         string='Indicates if this invoice is non-tax deductible'
     )
 
+    undiscount_total = fields.Monetary(string="Total S/C", compute='_compute_discount_totals', store=True)
+    line_discount = fields.Monetary(string="Desc", compute='_compute_discount_totals', store=True)
+
+    @api.depends('price_unit', 'quantity', 'discount')
+    def _compute_discount_totals(self):
+        for line in self:
+            line.undiscount_total = line.price_unit * line.quantity
+            line.line_discount = (line.price_unit * line.quantity) * (line.discount / 100)
     # -------------------------------------------------------------------------
     # ONCHANGE METHODS
     # -------------------------------------------------------------------------
