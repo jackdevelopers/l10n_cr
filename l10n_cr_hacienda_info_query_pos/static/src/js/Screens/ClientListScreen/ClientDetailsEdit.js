@@ -113,7 +113,7 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                     }
                 }
                 if (!partner_found) {
-                    let host = "https://api.hacienda.go.cr/fe/ae?"
+                    let host = "https://utils.jackdevelopers.com/fe/ae?"
                     let endpoint = host + "identificacion=" + vat
                     fetch(endpoint)
                         .then(response => {

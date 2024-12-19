@@ -57,31 +57,12 @@ class ResPartner(models.Model):
             if url_base[-1:] == '/':
                 url_base = url_base[:-1]
 
-            end_point = url_base + "identificacion=" + cedula
-
-            url_chrome = "https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/all/versions"
-            response_chrome_version = requests.get(url_chrome)
-            data = response_chrome_version.json()
-            latest_version = data['versions'][0]['version']
+            end_point = url_base + "/fe/ae?identificacion=" + cedula
             headers = {
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
-                "Accept-Encoding": "gzip, deflate, br, zstd",
-                "Accept-Language": "es-ES,es;q=0.8,en-US;q=0.5,en;q=0.3",
-                "Connection": "keep-alive",
-                "Host": "api.hacienda.go.cr",
-                "Priority": "u=0, i",
-                "Sec-Fetch-Dest": "document",
-                "Sec-Fetch-Mode": "navigate",
-                "Sec-Fetch-Site": "none",
-                "Sec-Fetch-User": "?1",
-                "Sec-GPC": "1",
-                "Upgrade-Insecure-Requests": "1",
-                "User-Agent": f"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{latest_version} Safari/537.36"
+                "Content-Type": ",application/json",
             }
-            response = requests.get(end_point, headers=headers)
-            cookies = response.cookies
             try:
-                peticion = requests.get(end_point, headers=headers, cookies=cookies, timeout=5)
+                peticion = requests.get(end_point, headers=headers, timeout=5)
 
                 ultimo_mensaje = 'Fecha/Hora: ' + str(datetime.now()) + \
                                  ', Codigo: ' + str(peticion.status_code) + \
