@@ -855,13 +855,14 @@ def consulta_clave(clave, token, tipo_ambiente):
 
 
 def get_economic_activities(company):
-    endpoint = "https://api.hacienda.go.cr/fe/ae?identificacion=" + company.vat
-
-    headers = {'Cache-Control': 'no-cache',
-               'Content-Type': 'application/x-www-form-urlencoded'}
-
+    get_param = company.env['ir.config_parameter'].sudo().get_param
+    url_base = get_param('url_base')
+    endpoint = url_base+"/fe/ae?identificacion=" + company.vat
+    headers = {
+        "Content-Type": ",application/json",
+    }
     try:
-        response = requests.get(endpoint, headers=headers, verify=False)
+        response = requests.get(endpoint, headers=headers, timeout=5)
     except requests.exceptions.RequestException as e:
         _logger.error('Exception %s', e)
         return {'status': -1, 'text': 'Excepcion %s' % e}

@@ -6,6 +6,6 @@
     </record>
     <record id="url_base" model="ir.config_parameter">
         <field name="key">url_base</field>
-        <field name="value">https://api.hacienda.go.cr/fe/ae?</field>
+        <field name="value">https://utils.jackdevelopers.com</field>
     </record>
 </odoo>

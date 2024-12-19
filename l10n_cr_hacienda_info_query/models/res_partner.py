@@ -57,11 +57,12 @@ class ResPartner(models.Model):
             if url_base[-1:] == '/':
                 url_base = url_base[:-1]
 
-            end_point = url_base + 'identificacion=' + cedula
-
-            headers = {'content-type': 'application/json', }
+            end_point = url_base + "/fe/ae?identificacion=" + cedula
+            headers = {
+                "Content-Type": ",application/json",
+            }
             try:
-                peticion = requests.get(end_point, headers=headers, timeout=10)
+                peticion = requests.get(end_point, headers=headers, timeout=5)
 
                 ultimo_mensaje = 'Fecha/Hora: ' + str(datetime.now()) + \
                                  ', Codigo: ' + str(peticion.status_code) + \

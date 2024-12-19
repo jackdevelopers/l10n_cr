@@ -22,7 +22,7 @@ class ResConfigSettings(models.TransientModel):
                                    help="Last API Response, this allows debugging errors if they exist")
     url_base = fields.Char(string="URL Base",
                            help="URL Base of the END POINT",
-                           default="https://api.hacienda.go.cr/fe/ae?")
+                           default="https://utils.jackdevelopers.com/fe/ae?")
 
     get_tributary_information = fields.Boolean(default=True)
     get_yo_contribuyo_information = fields.Boolean(default=True)

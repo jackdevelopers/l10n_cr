@@ -978,7 +978,6 @@ class AccountInvoiceElectronic(models.Model):
                         body=message,
                         subject=_('IMPORTANT NOTICE!!'),
                         message_type='notification',
-                        subtype=None,
                         parent_id=False,
                     )
 
@@ -1001,7 +1000,6 @@ class AccountInvoiceElectronic(models.Model):
                             body=msg_body + inv.number_electronic,
                             subject=_('Sending a second FEC'),
                             message_type='notification',
-                            subtype=None,
                             parent_id=False,
                             attachments=[
                                 [

@@ -52,12 +52,12 @@ class ActualizarPosApi(http.Controller):
             if url_base[-1:] == '/':
                 url_base = url_base[:-1]
 
-            end_point = url_base + 'identificacion=' + vat
-
-            headers = {'content-type': 'application/json', }
+            end_point = url_base + "identificacion=" + vat
+            headers = {
+                "Content-Type": ",application/json",
+            }
             try:
-                # Petición GET a la API
-                peticion = requests.get(end_point, headers=headers, timeout=3)
+                peticion = requests.get(end_point, headers=headers, timeout=5)
                 ultimo_mensaje = 'Fecha/Hora: ' + str(datetime.now()) + \
                                  ', Codigo: ' + str(peticion.status_code) + \
                                  ', Mensaje: ' + str(peticion._content.decode())

@@ -155,7 +155,7 @@ class CompanyElectronic(models.Model):
     url_base_exo = fields.Char(
         string="URL Base EXONET",
         help="URL Base ENDPOINT EXONET",
-        default="https://api.hacienda.go.cr/fe/ex?"
+        default="https://utils.jackdevelopers.com/fe/ex?"
     )
 
     # -------------------------------------------------------------------------
