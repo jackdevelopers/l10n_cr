@@ -189,7 +189,6 @@ class ResCurrencyRate(models.Model):
                         # Get the rate for this date to know it is already registered
                         companies = self.env['res.company'].search([])
                         for company in companies:
-                            _logger.error(company.id)
                             rates_ids = self.env['res.currency.rate'].search([('name', '=', current_date_str),
                                                                               ('company_id', '=', company.id)],
                                                                              limit=1)
@@ -310,32 +309,73 @@ class ResCurrencyRate(models.Model):
                     _logger.error('RequestException %s', e)
                     return False
                 if response.status_code in (200,):
-                    data = response.json()
+                    companies = self.env['res.company'].search([])
+                    for company in companies:
+                        _logger.info(initial_date)
+                        if company.currency_id.name == 'USD':
+                            # Save the exchange rate in database
+                            factor = self.env.ref('base.CRC').factor
+                            today = datetime.now().strftime('%Y-%m-%d')
+                            data = response.json()
+                            vals = {}
+                            rate = data[0]['venta']
+                            rate2 = data[0]['compra']
+                            rate = rate + (rate * (factor / 100))
+                            vals['original_rate'] = 1 / rate
+                            vals['inverse_company_rate'] = data[0]['venta']
 
-                    for rate_line in data:
-                        today = datetime.strptime(rate_line['fecha'], '%Y-%m-%d %H:%M:%S')
-                        vals = {}
-                        vals['original_rate'] = rate_line['venta']
-                        vals['inverse_company_rate'] = rate_line['venta']
-                        # Odoo utiliza un valor inverso,
-                        # a cuantos dólares equivale 1 colón, por eso se divide 1 / tipo de cambio.
-                        vals['rate'] = 1 / rate_line['original_rate']
-                        vals['original_rate_2'] = rate_line['compra']
-                        # vals['inverse_company_rate_2'] = rate_line['compra']
-                        vals['rate_2'] = 1 / rate_line['original_rate_2']
-                        vals['currency_id'] = self.env.ref('base.USD').id
+                            # Odoo utiliza un valor inverso,
+                            # a cuantos dólares equivale 1 colón, por eso se divide 1 / tipo de cambio.
 
-                        companies = self.env['res.company'].search([])
-                        for company in companies:
-                            _logger.error(company.id)
-                            rate_id = self.env['res.currency.rate'].search([('name', '=', today.date()),
+                            vals['company_rate'] = rate
+
+                            rate2 = rate2 + (rate2 * (factor / 100))
+                            vals['original_rate_2'] = 1 / rate2
+                            # vals['inverse_company_rate_2'] = data['dolar']['compra']['valor']
+                            vals['rate_2'] = 1 / rate2
+                            vals['currency_id'] = self.env.ref('base.CRC').id
+                            rate_id = self.env['res.currency.rate'].search([('name', '=', initial_date),
                                                                             ('company_id', '=', company.id)], limit=1)
                             vals['company_id'] = company.id
+                            _logger.info(vals)
                             if rate_id:
                                 rate_id.sudo().write(vals)
                             else:
-                                vals['name'] = today.date()
+                                vals['name'] = initial_date
                                 self.sudo().create(vals)
+                        if company.currency_id.name == 'CRC':
+                            # Save the exchange rate in database
+                            factor = self.env.ref('base.USD').factor
+                            today = datetime.now().strftime('%Y-%m-%d')
+                            data = response.json()
+                            vals = {}
+                            rate = data[0]['venta']
+                            rate = rate + (rate * (factor / 100))
+                            vals['original_rate'] = rate
+                            vals['inverse_company_rate'] = data[0]['venta']
+
+                            # Odoo utiliza un valor inverso,
+                            # a cuantos dólares equivale 1 colón, por eso se divide 1 / tipo de cambio.
+
+                            vals['rate'] = 1 / vals['original_rate']
+
+                            rate2 = data[0]['compra']
+                            rate2 = rate2 + (rate2 * (factor / 100))
+                            vals['original_rate_2'] = rate2
+                            # vals['inverse_company_rate_2'] = data['dolar']['compra']['valor']
+                            vals['rate_2'] = 1 / vals['original_rate_2']
+                            vals['currency_id'] = self.env.ref('base.USD').id
+                            rate_id = self.env['res.currency.rate'].search([('name', '=', initial_date),
+                                                                            ('company_id', '=', company.id)],
+                                                                           limit=1)
+                            vals['company_id'] = company.id
+
+                            if rate_id:
+                                rate_id.sudo().write(vals)
+                            else:
+                                vals['name'] = initial_date
+                                self.sudo().create(vals)
+                            _logger.info(vals)
             else:
                 try:
                     url_chrome = "https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/all/versions"
@@ -369,7 +409,6 @@ class ResCurrencyRate(models.Model):
                 if response.status_code in (200,):
                     companies = self.env['res.company'].search([])
                     for company in companies:
-                        _logger.error(company.id)
                         if company.currency_id.name == 'USD':
                             # Save the exchange rate in database
                             factor = self.env.ref('base.CRC').factor
@@ -393,11 +432,10 @@ class ResCurrencyRate(models.Model):
                             # vals['inverse_company_rate_2'] = data['dolar']['compra']['valor']
                             vals['rate_2'] = 1/ rate2
                             vals['currency_id'] = self.env.ref('base.CRC').id
-
-                            _logger.error(company.id)
                             rate_id = self.env['res.currency.rate'].search([('name', '=', today),
                                                                             ('company_id', '=', company.id)], limit=1)
                             vals['company_id'] = company.id
+                            _logger.info(vals)
                             if rate_id:
                                 rate_id.sudo().write(vals)
                             else:
@@ -426,18 +464,17 @@ class ResCurrencyRate(models.Model):
                             vals['rate_2'] = 1 / vals['original_rate_2']
                             vals['currency_id'] = self.env.ref('base.USD').id
 
-                            _logger.error(company.id)
                             rate_id = self.env['res.currency.rate'].search([('name', '=', today),
                                                                             ('company_id', '=', company.id)],
                                                                            limit=1)
                             vals['company_id'] = company.id
+                            _logger.info(vals)
                             if rate_id:
                                 rate_id.sudo().write(vals)
                             else:
                                 vals['name'] = today
                                 self.sudo().create(vals)
 
-                _logger.info(vals)
 
         _logger.info("=========================================================")
 
