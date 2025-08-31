@@ -8,6 +8,7 @@ from . import api_facturae
 from . import code_type_product
 from . import fe_enums
 from . import identification_type
+from . import discount_type
 from . import product_template
 from . import product_category
 from . import reference_code

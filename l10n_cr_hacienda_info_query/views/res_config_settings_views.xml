@@ -10,48 +10,32 @@
                 <div id="electronic_invoice">
                     <h2>Electronic Invoicing Costa Rica</h2>
                     <div class="row mt16 o_settings_container" name="users_setting_container">
-                        <div class="col-12 col-lg-6 o_setting_box" id="YO Contribuyo">
-                            <div class="o_setting_left_pane">
-                                <field name="get_yo_contribuyo_information"/>
-                            </div>
-                            <div class="o_setting_right_pane">
-                                <span class="o_form_label">YO Contribuyo</span>
-                            </div>
-                        </div>
-                        <div class="col-12 col-lg-6 o_setting_box" id="YO Contribuyo">
-                            <div class="o_setting_right_pane" attrs="{'invisible':[('get_yo_contribuyo_information', '=', False)]}">
-                                <separator string="YO Contribuyo"/>
-                                <label for="url_base_yo_contribuyo"/>
-                                <br/>
-                                <field name="url_base_yo_contribuyo" value="https://api.hacienda.go.cr/fe/mifacturacorreo?"/>
-                                <br/>
-                                <br/>
-                                <label for="usuario_yo_contribuyo"/>
-                                <br/>
-                                <field name="usuario_yo_contribuyo"/>
-                                <br/>
-                                <br/>
-                                <label for="token_yo_contribuyo"/>
-                                <br/>
-                                <field name="token_yo_contribuyo"/>
-                            </div>
-                        </div>
-
-                        <div class="col-12 col-lg-6 o_setting_box" id="companies_setting">
+                       <div class="col-12 col-lg-6 o_setting_box" id="companies_setting">
                             <div class="o_setting_left_pane">
                                 <field name="get_tributary_information"/>
                             </div>
                             <div class="o_setting_right_pane">
                                 <span class="o_form_label">Tributary information</span>
                             </div>
+                            <div class="o_setting_left_pane" attrs="{'invisible':[('get_tributary_information', '=', False)]}">
+                                 <field name="is_gometa_api" />
+                             </div>
+                            <div class="o_setting_right_pane" attrs="{'invisible':[('get_tributary_information', '=', False)]}">
+                                <span class="o_form_label">Api Gometa</span>
+                            </div>
                         </div>
                         <div class="col-12 col-lg-6 o_setting_box" id="companies_setting">
                             <div class="o_setting_right_pane" attrs="{'invisible':[('get_tributary_information', '=', False)]}">
                                 <separator string="Tributary information"/>
-                                <label for="url_base"/>
-                                <br/>
-                                <field name="url_base" value="https://utils.jackdevelopers.com"/>
-                                <br/>
+                                <div class="row mt16">
+                                    <label for="url_base" />
+                                    <field name="url_base" />
+                                </div>
+                                <br />
+                                 <div class="row mt16" attrs="{'invisible':[('is_gometa_api', '=', False)]}">
+                                     <label for="url_key"/>
+                                    <field name="url_key"/>
+                                </div>
                                 <br/>
                                 <label for="ultima_respuesta"/>
                                 <br/>

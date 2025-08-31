@@ -58,7 +58,7 @@
     <record id="uom.product_uom_kgm" model="uom.uom">
         <field name="category_id" ref="uom.product_uom_categ_kgm"/>
         <field name="name">Kilogramo</field>
-        <field name="code">kg</field>
+        <field name="code">Kg</field>
         <field name="uom_type">reference</field>
         <field name="active">True</field>
     </record>

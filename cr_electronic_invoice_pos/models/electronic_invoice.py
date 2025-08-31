@@ -133,6 +133,11 @@ class PosOrder(models.Model):
 
     economic_activity_id = fields.Many2one("economic.activity", string="Economic Activity", )
 
+    number_activity_id = fields.Char('Number of Activity',
+                                     related="partner_id.number_activity_id",
+                                     store=True,
+                                     index=True)
+
     _sql_constraints = [
         ('number_electronic_uniq', 'unique (number_electronic)', "La clave de comprobante debe ser única"),
     ]

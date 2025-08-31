@@ -12,6 +12,11 @@ class InvoiceLineElectronic(models.Model):
     # ==============================================================================================
 
     discount_note = fields.Char()
+    discount_type = fields.Many2one(
+        comodel_name="discount.type",
+        string="Discount Types",
+        default=lambda self: self.env.ref('cr_electronic_invoice.Discounttype_07', raise_if_not_found=False)
+    )
     total_tax = fields.Float()
     third_party_id = fields.Many2one(
         comodel_name="res.partner",

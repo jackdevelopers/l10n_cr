@@ -73,11 +73,13 @@
             </xpath>
 
             <xpath expr="//field[@name='invoice_line_ids']//tree//field[@name='discount']" position="after">
+                 <field name="discount_type" optional="hide" />
                 <field name="discount_note" optional="hide"/>
                 <field name="tariff_head" optional="hide"/>
             </xpath>
             <!-- Move views -->
             <xpath expr="//field[@name='line_ids']//tree//field[@name='discount']" position="after">
+                 <field name="discount_type" optional="hide" />
                 <field name="discount_note" optional="hide"/>
                 <field name="tariff_head" optional="hide"/>
             </xpath>

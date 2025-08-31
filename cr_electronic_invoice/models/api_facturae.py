@@ -297,10 +297,10 @@ def gen_xml_mr_43(clave, cedula_emisor, fecha_emision, id_mensaje,
     # Iniciamos con la creación del mensaje Receptor
     sb = StringBuilder()
     sb.append('<MensajeReceptor xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ')
-    sb.append('xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/mensajeReceptor" ')
-    sb.append('xsi:schemaLocation="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.3/mensajeReceptor ')
+    sb.append('xmlns="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/mensajeReceptor" ')
+    sb.append('xsi:schemaLocation="https://cdn.comprobanteselectronicos.go.cr/xml-schemas/v4.4/mensajeReceptor ')
     sb.append('https://www.hacienda.go.cr/ATV/ComprobanteElectronico/' +
-              'docs/esquemas/2016/v4.3/MensajeReceptor_V4.3.xsd">')
+              'docs/esquemas/2016/v4.4/MensajeReceptor_V4.4.xsd">')
     sb.append('<Clave>' + mr_clave + '</Clave>')
     sb.append('<NumeroCedulaEmisor>' + mr_cedula_emisor + '</NumeroCedulaEmisor>')
     sb.append('<FechaEmisionDoc>' + mr_fecha_emision + '</FechaEmisionDoc>')
@@ -338,9 +338,9 @@ def gen_xml_mr_43(clave, cedula_emisor, fecha_emision, id_mensaje,
 
     return str(sb)
 
-def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
-                total_servicio_exento, totalServExonerado,
-                total_mercaderia_gravado, total_mercaderia_exento,
+def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
+                total_servicio_exento,total_servicio_no_sujeto, totalServExonerado,
+                total_mercaderia_gravado, total_mercaderia_exento, total_mercaderia_no_sujeto,
                 totalMercExonerada, totalOtrosCargos, total_iva_devuelto, base_total,
                 total_impuestos, total_descuento, lines,
                 otrosCargos, currency_rate, invoice_comments,
@@ -349,6 +349,8 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
 
     numero_linea = 0
     payment_methods_id = []
+    payment_methods_amount = {}
+    tax_desgloss = {}
 
     if inv._name == 'pos.order':
         plazo_credito = '0'
@@ -356,9 +358,17 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
             # En caso que no tenga código definido se colocará el de efectivo para evitar rechazos de documentos
             if not payment.payment_method_id.sequence:
                 payment_methods_id.append('01')
+                if '01' in payment_methods_amount:
+                    payment_methods_amount['01'] += payment.amount
+                else:
+                    payment_methods_amount['01'] = payment.amount
             else:
                 # Se agrega el campo code en los métodos de pago de Odoo POS
                 payment_methods_id.append(str(payment.payment_method_id.sequence))
+                if str(payment.payment_method_id.sequence) in payment_methods_amount:
+                    payment_methods_amount[str(payment.payment_method_id.sequence)] += payment.amount
+                else:
+                    payment_methods_amount[str(payment.payment_method_id.sequence)] = payment.amount
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
@@ -385,7 +395,10 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
     sb.append('xsi:schemaLocation="' + fe_enums.schemaLocation[inv.tipo_documento] + '">')
 
     sb.append('<Clave>' + inv.number_electronic + '</Clave>')
-    sb.append('<CodigoActividad>' + activity + '</CodigoActividad>')
+    sb.append('<ProveedorSistemas>' + inv.company_id.vat  + '</ProveedorSistemas>')
+    sb.append('<CodigoActividadEmisor>' + inv.economic_activity_id.code + '</CodigoActividadEmisor>')
+    if inv.tipo_documento != 'TE' and tipo_documento_referencia != '04':
+        sb.append('<CodigoActividadReceptor>' + inv.economic_activity_id.code + '</CodigoActividadReceptor>')
     sb.append('<NumeroConsecutivo>' + inv.number_electronic[21:41] + '</NumeroConsecutivo>')
     sb.append('<FechaEmision>' + inv.date_issuance + '</FechaEmision>')
     sb.append('<Emisor>')
@@ -394,16 +407,16 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
     sb.append('<Tipo>' + issuing_company.identification_id.code + '</Tipo>')
     sb.append('<Numero>' + issuing_company.vat + '</Numero>')
     sb.append('</Identificacion>')
-    sb.append('<NombreComercial>' + escape(str(issuing_company.commercial_name or 'NA')) + '</NombreComercial>')
+    sb.append('<NombreComercial>' + escape(str(issuing_company.commercial_name or 'NoAplica')) + '</NombreComercial>')
     sb.append('<Ubicacion>')
     sb.append('<Provincia>' + issuing_company.state_id.code + '</Provincia>')
     sb.append('<Canton>' + issuing_company.county_id.code + '</Canton>')
     sb.append('<Distrito>' + issuing_company.district_id.code + '</Distrito>')
 
-    if issuing_company.neighborhood_id and issuing_company.neighborhood_id.code:
-        sb.append('<Barrio>' + str(issuing_company.neighborhood_id.code or '00') + '</Barrio>')
+#    if issuing_company.neighborhood_id and issuing_company.neighborhood_id.code:
+#        sb.append('<Barrio>' + str(issuing_company.neighborhood_id.code or '00') + '</Barrio>')
 
-    sb.append('<OtrasSenas>' + escape(str(issuing_company.street or 'NA')) + '</OtrasSenas>')
+    sb.append('<OtrasSenas>' + escape(str(issuing_company.street or 'NoAplica')) + '</OtrasSenas>')
     sb.append('</Ubicacion>')
 
     if issuing_company.phone:
@@ -454,10 +467,10 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
                     sb.append('<Canton>' + str(receiver_company.county_id.code or '') + '</Canton>')
                     sb.append('<Distrito>' + str(receiver_company.district_id.code or '') + '</Distrito>')
 
-                    if receiver_company.neighborhood_id and receiver_company.neighborhood_id.code:
-                        sb.append('<Barrio>' + str(receiver_company.neighborhood_id.code or '00') + '</Barrio>')
+#                    if receiver_company.neighborhood_id and receiver_company.neighborhood_id.code:
+#                        sb.append('<Barrio>' + str(receiver_company.neighborhood_id.code or '00') + '</Barrio>')
 
-                    sb.append('<OtrasSenas>' + escape(str(receiver_company.street or 'NA')) + '</OtrasSenas>')
+                    sb.append('<OtrasSenas>' + escape(str(receiver_company.street or 'NoAplica')) + '</OtrasSenas>')
                     sb.append('</Ubicacion>')
 
                 if receiver_company.phone:
@@ -482,9 +495,9 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
 
     sb.append('<CondicionVenta>' + sale_conditions + '</CondicionVenta>')
     sb.append('<PlazoCredito>' + plazo_credito + '</PlazoCredito>')
-    payment_method_length = len(payment_methods_id)
-    for payment_method_counter in range(payment_method_length):
-        sb.append('<MedioPago>' + payment_methods_id[payment_method_counter] + '</MedioPago>')
+#    payment_method_length = len(payment_methods_id)
+#    for payment_method_counter in range(payment_method_length):
+#        sb.append('<MedioPago>' + payment_methods_id[payment_method_counter] + '</MedioPago>')
 
     if lines:
         sb.append('<DetalleServicio>')
@@ -499,7 +512,7 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
                 sb.append('<PartidaArancelaria>' + str(v['partidaArancelaria']) + '</PartidaArancelaria>')
 
             if v.get('codigoCabys'):
-                sb.append('<Codigo>' + (v['codigoCabys']) + '</Codigo>')
+                sb.append('<CodigoCABYS>' + (v['codigoCabys']) + '</CodigoCABYS>')
 
             if v.get('codigo'):
                 sb.append('<CodigoComercial>')
@@ -510,20 +523,26 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
             sb.append('<Cantidad>' + str(v['cantidad']) + '</Cantidad>')
             sb.append('<UnidadMedida>' + str(v['unidadMedida']) + '</UnidadMedida>')
             sb.append('<Detalle>' + str(v['detalle']) + '</Detalle>')
+            if v.get('RegistroMedicamento'):
+                sb.append('<RegistroMedicamento>' + (v['RegistroMedicamento']) + '</RegistroMedicamento>')
+            if v.get('FormaFarmaceutica'):
+                sb.append('<FormaFarmaceutica>' + (v['FormaFarmaceutica']) + '</FormaFarmaceutica>')
             sb.append('<PrecioUnitario>' + str(v['precioUnitario']) + '</PrecioUnitario>')
             sb.append('<MontoTotal>' + str(v['montoTotal']) + '</MontoTotal>')
             if v.get('montoDescuento'):
                 sb.append('<Descuento>')
-                sb.append('<MontoDescuento>' + str(v['montoDescuento']) + '</MontoDescuento>')
-                if v.get('naturalezaDescuento'):
+                sb.append('<CodigoDescuento>' + str(v['tipoDescuento']) + '</CodigoDescuento>')
+                if (v['tipoDescuento'] == 99) and v.get('naturalezaDescuento'):
+                    sb.append('<CodigoDescuentoOTRO>' + str(v['naturalezaDescuento']) + '</CodigoDescuentoOTRO>')
                     sb.append('<NaturalezaDescuento>' + str(v['naturalezaDescuento']) + '</NaturalezaDescuento>')
+                sb.append('<MontoDescuento>' + str(v['montoDescuento']) + '</MontoDescuento>')
                 sb.append('</Descuento>')
 
             sb.append('<SubTotal>' + str(v['subtotal']) + '</SubTotal>')
 
             # TODO: ¿qué es base imponible? ¿porqué podría ser diferente del subtotal?
-            # if inv.tipo_documento != 'FEE':
-            #   sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
+            if inv.tipo_documento != 'FEE':
+                sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
 
             if v.get('impuesto'):
                 for (a, b) in v['impuesto'].items():
@@ -531,36 +550,58 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
                     sb.append('<Impuesto>')
                     sb.append('<Codigo>' + str(b['codigo']) + '</Codigo>')
                     if tax_code.isdigit():
-                        sb.append('<CodigoTarifa>' + tax_code + '</CodigoTarifa>')
+                        sb.append('<CodigoTarifaIVA>' + tax_code + '</CodigoTarifaIVA>')
                     sb.append('<Tarifa>' + str(b['tarifa']) + '</Tarifa>')
                     sb.append('<Monto>' + str(b['monto']) + '</Monto>')
+
+                    if tax_code in tax_desgloss:
+                        if b.get('exoneracion'):
+                            if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
+                                actual_tax_amount = tax_desgloss[tax_code][1]
+                                actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
+                                tax_desgloss[tax_code] = [str(b['codigo']),str(actual_tax_amount)]
+                        else:
+                            actual_tax_amount = tax_desgloss[tax_code][1]
+                            actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
+                            tax_desgloss[tax_code] = [str(b['codigo']),str(actual_tax_amount)]
+                    else:
+                        if b.get('exoneracion'):
+                            if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
+                                tax_desgloss[tax_code] = [str(b['codigo']),str(b['monto'])]
+                        else:
+                            tax_desgloss[tax_code] = [str(b['codigo']),str(b['monto'])]
 
                     if inv.tipo_documento != 'FEE':
                         if b.get('exoneracion'):
                             sb.append('<Exoneracion>')
-
-                            sb.append('<TipoDocumento>' +
+                            sb.append('<TipoDocumentoEX1>' +
                                       receiver_company.type_exoneration.code +
-                                      '</TipoDocumento>')
+                                      '</TipoDocumentoEX1>')
                             sb.append('<NumeroDocumento>' +
                                       receiver_company.exoneration_number +
                                       '</NumeroDocumento>')
+                            if receiver_company.type_exoneration.code in ('02', '03', '06', '07', '08'):
+                                sb.append('<Articulo>' +
+                                          "696969" +
+                                          '</Articulo>')
+                                sb.append('<Inciso>' +
+                                          "696969" +
+                                          '</Inciso>')
                             sb.append('<NombreInstitucion>' +
                                       receiver_company.institution_name +
                                       '</NombreInstitucion>')
-                            sb.append('<FechaEmision>' +
+                            sb.append('<FechaEmisionEX>' +
                                       str(receiver_company.date_issue) + 'T00:00:00-06:00' +
-                                      '</FechaEmision>')
-                            sb.append('<PorcentajeExoneracion>' +
+                                      '</FechaEmisionEX>')
+                            sb.append('<TarifaExonerada>' +
                                       str(b['exoneracion']['porcentajeCompra']) +
-                                      '</PorcentajeExoneracion>')
+                                      '</TarifaExonerada>')
                             sb.append('<MontoExoneracion>' +
                                       str(b['exoneracion']['montoImpuesto']) +
                                       '</MontoExoneracion>')
-
                             sb.append('</Exoneracion>')
                     sb.append('</Impuesto>')
-
+                sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
                 sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
 
             sb.append('<MontoTotalLinea>' + str(v['montoTotalLinea']) + '</MontoTotalLinea>')
@@ -593,24 +634,26 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
     sb.append('<CodigoMoneda>' + cod_moneda + '</CodigoMoneda>')
     sb.append('<TipoCambio>' + str(currency_rate) + '</TipoCambio>')
     sb.append('</CodigoTipoMoneda>')
-
     sb.append('<TotalServGravados>' + str(total_servicio_gravado) + '</TotalServGravados>')
     sb.append('<TotalServExentos>' + str(total_servicio_exento) + '</TotalServExentos>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalServExonerado>' + str(totalServExonerado) + '</TotalServExonerado>')
+    sb.append('<TotalServNoSujeto>' + str(total_servicio_no_sujeto) + '</TotalServNoSujeto>')
 
     sb.append('<TotalMercanciasGravadas>' + str(total_mercaderia_gravado) + '</TotalMercanciasGravadas>')
     sb.append('<TotalMercanciasExentas>' + str(total_mercaderia_exento) + '</TotalMercanciasExentas>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalMercExonerada>' + str(totalMercExonerada) + '</TotalMercExonerada>')
+    sb.append('<TotalMercNoSujeta>' + str(total_mercaderia_no_sujeto) + '</TotalMercNoSujeta>')
 
     sb.append('<TotalGravado>' + str(round(total_servicio_gravado + total_mercaderia_gravado, 5)) + '</TotalGravado>')
     sb.append('<TotalExento>' + str(round(total_servicio_exento + total_mercaderia_exento, 5)) + '</TotalExento>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalExonerado>' + str(round(totalServExonerado + totalMercExonerada, 5)) + '</TotalExonerado>')
+    sb.append('<TotalNoSujeto>' + str(round(total_servicio_no_sujeto + total_mercaderia_no_sujeto, 5)) + '</TotalNoSujeto>')
 
     sb.append('<TotalVenta>' +
               str(round(total_servicio_gravado +
@@ -622,12 +665,27 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
               '</TotalVenta>')
     sb.append('<TotalDescuentos>' + str(round(total_descuento, 5)) + '</TotalDescuentos>')
     sb.append('<TotalVentaNeta>' + str(round(base_total, 5)) + '</TotalVentaNeta>')
+    if tax_desgloss:
+        for tax_detail in tax_desgloss:
+            sb.append('<TotalDesgloseImpuesto>')
+            sb.append('<Codigo>'+str(tax_desgloss[tax_detail][0])+'</Codigo>')
+            sb.append('<CodigoTarifaIVA>'+str(tax_detail)+'</CodigoTarifaIVA>')
+            sb.append('<TotalMontoImpuesto>'+str(round(float(tax_desgloss[tax_detail][1]),5))+'</TotalMontoImpuesto>')
+            sb.append('</TotalDesgloseImpuesto>')
     sb.append('<TotalImpuesto>' + str(round(total_impuestos, 5)) + '</TotalImpuesto>')
 
     if total_iva_devuelto:
         sb.append('<TotalIVADevuelto>' + str(round(total_iva_devuelto, 5)) + '</TotalIVADevuelto>')
 
     sb.append('<TotalOtrosCargos>' + str(totalOtrosCargos) + '</TotalOtrosCargos>')
+
+    payment_method_length = len(payment_methods_id)
+    for payment_method_counter in range(payment_method_length):
+        sb.append('<MedioPago>')
+        sb.append('<TipoMedioPago>' + payment_methods_id[payment_method_counter] + '</TipoMedioPago>')
+        if payment_methods_amount:
+            sb.append('<TotalMedioPago>' + str(payment_methods_amount[payment_methods_id[payment_method_counter]]) + '</TotalMedioPago>')
+        sb.append('</MedioPago>')
 
     sb.append('<TotalComprobante>' +
               str(round(base_total + total_impuestos + totalOtrosCargos - total_iva_devuelto, 5)) +
@@ -637,9 +695,9 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
 
     if tipo_documento_referencia and numero_documento_referencia and fecha_emision_referencia:
         sb.append('<InformacionReferencia>')
-        sb.append('<TipoDoc>' + str(tipo_documento_referencia) + '</TipoDoc>')
+        sb.append('<TipoDocIR>' + str(tipo_documento_referencia) + '</TipoDocIR>')
         sb.append('<Numero>' + str(numero_documento_referencia) + '</Numero>')
-        sb.append('<FechaEmision>' + fecha_emision_referencia + '</FechaEmision>')
+        sb.append('<FechaEmisionIR>' + fecha_emision_referencia + '</FechaEmisionIR>')
         sb.append('<Codigo>' + str(codigo_referencia) + '</Codigo>')
         sb.append('<Razon>' + str(razon_referencia) + '</Razon>')
         sb.append('</InformacionReferencia>')
@@ -650,20 +708,19 @@ def gen_xml_v43(inv, activity, sale_conditions, total_servicio_gravado,
                 sb.append('<OtroTexto codigo="OC">' + str(invoice_comments) + '</OtroTexto>')
             else:
                 sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
-        if order_number:
-            sb.append('<OtroContenido>')
-            sb.append(
-                '<CompraEntrega xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org/esquemas/CompraEntrega/">')
-            sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
-            sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
-            sb.append('</CompraEntrega>')
-            sb.append('</OtroContenido>')
-        if invoice_ref:
-            sb.append('<OtroContenido>')
-            sb.append('<InformacionAdicional xmlns="https://FE-CR/DataInfo.xsd">')
-            sb.append('<OrdenCompra>' + invoice_ref + '</OrdenCompra>')
-            sb.append('</InformacionAdicional>')
-            sb.append('</OtroContenido>')
+            if order_number:
+                sb.append('<OtroContenido>')
+                sb.append('<CompraEntrega xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org / esquemas / CompraEntrega / ">')
+                sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
+                sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
+                sb.append('</CompraEntrega>')
+                sb.append('</OtroContenido>')
+            if invoice_ref:
+                sb.append('<OtroContenido>')
+                sb.append('<InformacionAdicional xmlns="https://FE-CR/DataInfo.xsd">')
+                sb.append('<OrdenCompra>' + invoice_ref + '</OrdenCompra>')
+                sb.append('</InformacionAdicional>')
+                sb.append('</OtroContenido>')
         sb.append('</Otros>')
 
     sb.append('</' + fe_enums.tagName[inv.tipo_documento] + '>')
@@ -854,34 +911,6 @@ def consulta_clave(clave, token, tipo_ambiente):
     return response_json
 
 
-def get_economic_activities(company):
-    get_param = company.env['ir.config_parameter'].sudo().get_param
-    url_base = get_param('url_base')
-    endpoint = url_base+"/fe/ae?identificacion=" + company.vat
-    headers = {
-        "Content-Type": ",application/json",
-    }
-    try:
-        response = requests.get(endpoint, headers=headers, timeout=5)
-    except requests.exceptions.RequestException as e:
-        _logger.error('Exception %s', e)
-        return {'status': -1, 'text': 'Excepcion %s' % e}
-
-    if 200 <= response.status_code <= 299:
-        _logger.debug('FECR - get_economic_activities response: %s', (response.json()))
-        response_json = {'status': 200,
-                         'activities': response.json().get('actividades'),
-                         'name': response.json().get('nombre')}
-    # elif 400 <= response.status_code <= 499:
-    #    response_json = {'status': 400, 'ind-estado': 'error'}
-    else:
-        _logger.error('FECR - get_economic_activities failed.  error: %s',
-                      response.status_code)
-        response_json = {'status': response.status_code,
-                         'text': 'get_economic_activities failed: %s' % response.reason}
-    return response_json
-
-
 def consulta_documentos(self, inv, env, token_m_h, date_cr, xml_firmado):
     if (inv.move_type in ['in_invoice', 'in_refund']) and (inv.tipo_documento != 'FEC'):
         clave = inv.number_electronic + "-" + inv.consecutive_number_receiver
@@ -998,7 +1027,7 @@ def send_message(inv, date_cr, xml, token, env):
     return {'status': response.status_code, 'text': response.headers.get('X-Error-Cause', 'Unknown')}
 
 
-def load_xml_data(invoice, load_lines, account_id, product_id=False, analytic_account_id=False):
+def load_xml_data(invoice, load_lines, load_product_by_code, create_partner_automatically, create_product_by_code, account_id, product_id=False, analytic_account_id=False):
     try:
         invoice_xml = etree.fromstring(base64.b64decode(invoice.xml_supplier_approval))
         doc_types = 'FacturaElectronica|NotaCreditoElectronica|NotaDebitoElectronica|TiqueteElectronico'
@@ -1013,6 +1042,8 @@ def load_xml_data(invoice, load_lines, account_id, product_id=False, analytic_ac
     namespaces = invoice_xml.nsmap
     inv_xmlns = namespaces.pop(None)
     namespaces['inv'] = inv_xmlns
+    missing_products_message = ""
+    created_products_message = ""
 
     # invoice.consecutive_number_receiver = invoice_xml.xpath("inv:NumeroConsecutivo", namespaces=namespaces)[0].text
     invoice.ref = invoice_xml.xpath("inv:NumeroConsecutivo", namespaces=namespaces)[0].text
@@ -1029,9 +1060,10 @@ def load_xml_data(invoice, load_lines, account_id, product_id=False, analytic_ac
         activity_id = activity.id
 
     invoice.economic_activity_id = activity
+#    invoice.partner_economic_activity_id = activity
     invoice.date_issuance = invoice_xml.xpath("inv:FechaEmision", namespaces=namespaces)[0].text
     invoice.invoice_date = invoice.date_issuance
-    invoice.tipo_documento = False
+    invoice.tipo_documento = fe_enums.TipoDocumentoFromXMLNode[document_type] 
 
     emisor = invoice_xml.xpath("inv:Emisor/inv:Identificacion/inv:Numero", namespaces=namespaces)[0].text
     tipo_emisor = invoice_xml.xpath("inv:Emisor/inv:Identificacion/inv:Tipo", namespaces=namespaces)[0].text
@@ -1075,20 +1107,20 @@ def load_xml_data(invoice, load_lines, account_id, product_id=False, analytic_ac
     if partner:
         invoice.partner_id = partner
     else:
-        new_partner = invoice.env['res.partner'].create({'name': nombre_emisor,
-                                                         'vat': emisor,
-                                                         'identification_id': tipo_emisor,
-                                                         'type': 'contact',
-                                                         'country_id': pais_emisor,
-                                                         'phone': telefono_emisor,
-                                                         'email': correo_emisor,
-                                                         'street': otrassenas_emisor,
-                                                         'supplier': 'True'})
-        if new_partner:
-            invoice.partner_id = new_partner
-        else:
-            raise UserError(_('The provider in the invoice does not exists. ' +
-                              'I tried to created without success. Please review it.'))
+        if create_partner_automatically: 
+            new_partner = invoice.env['res.partner'].create({'name': nombre_emisor,
+                                                             'vat': emisor,
+                                                             'identification_id': tipo_emisor,
+                                                             'type': 'contact',
+                                                             'country_id': pais_emisor,
+                                                             'phone': telefono_emisor,
+                                                             'email': correo_emisor,
+                                                             'street': otrassenas_emisor})
+            if new_partner:
+                invoice.partner_id = new_partner
+            else:
+                raise UserError(_('The provider in the invoice does not exists. ' +
+                                  'I tried to created without success. Please review it.'))
 
     # invoice.account_id = partner.property_account_payable_id
     invoice.invoice_payment_term_id = partner.property_supplier_payment_term_id
@@ -1115,10 +1147,38 @@ def load_xml_data(invoice, load_lines, account_id, product_id=False, analytic_ac
     if load_lines:
         lines = invoice_xml.xpath("inv:DetalleServicio/inv:LineaDetalle", namespaces=namespaces)
         new_lines = []
+
         for line in lines:
             product_uom = invoice.env['uom.uom'].search([('code', '=', line.xpath("inv:UnidadMedida",
                                                                                   namespaces=namespaces)[0].text)],
                                                         limit=1).id
+            if line.xpath("inv:CodigoComercial/inv:Codigo",namespaces=namespaces):
+                 invoice_product_default_code = line.xpath("inv:CodigoComercial/inv:Codigo",namespaces=namespaces)[0].text
+            else:
+                 invoice_product_default_code = "00000"
+            invoice_product_name = line.xpath("inv:Detalle",namespaces=namespaces)[0].text
+            invoice_product_quantity = float(line.xpath("inv:Cantidad",namespaces=namespaces)[0].text)
+            invoice_product_total_amount = float(line.xpath("inv:MontoTotalLinea",namespaces=namespaces)[0].text)
+            try:
+                invoice_product_tax_code = float(line.xpath("inv:Impuesto/inv:CodigoTarifa",namespaces=namespaces)[0].text)
+            except:
+                invoice_product_tax_code = ""
+                invoice.message_post(subject=_('Warning'), body="Missing tax for product: "+invoice_product_name)
+            invoice_product_amount = invoice_product_total_amount / invoice_product_quantity
+            inventory_product = invoice.env['product.product'].with_context(active_test=False).search([('default_code',
+                                                                                             '=',
+                                                                                             invoice_product_default_code)],
+                                                                                           limit=1)
+            if not inventory_product:
+                if create_product_by_code:
+                    product = invoice.env['product.product'].create({'name': invoice_product_name,
+                                                             'detailed_type': 'product',
+                                                             'standard_price': invoice_product_amount,
+                                                             'default_code': invoice_product_default_code})
+
+                else:
+                    missing_products_message = missing_products_message + invoice_product_name + ": " + invoice_product_default_code + "<br>"
+                
             total_amount = float(line.xpath("inv:MontoTotal", namespaces=namespaces)[0].text)
 
             discount_percentage = 0.0
@@ -1187,22 +1247,41 @@ def load_xml_data(invoice, load_lines, account_id, product_id=False, analytic_ac
                                       'registered in the system'))
 
             _logger.debug('E-INV CR - impuestos de linea: %s', (taxes))
-            columns = {'name': line.xpath("inv:Detalle", namespaces=namespaces)[0].text,
-                       'move_id': invoice.id,
-                       'price_unit': line.xpath("inv:PrecioUnitario", namespaces=namespaces)[0].text,
-                       'quantity': line.xpath("inv:Cantidad", namespaces=namespaces)[0].text,
-                       'product_uom_id': product_uom,
-                       'sequence': line.xpath("inv:NumeroLinea", namespaces=namespaces)[0].text,
-                       'discount': discount_percentage,
-                       'discount_note': discount_note,
-                       'product_id': product,
-                       'account_id': account_id.id,
-                       'analytic_account_id': analytic_account,
-                       'economic_activity_id': activity_id,
-                       'tax_ids': taxes}
+            if load_product_by_code and inventory_product:
+                columns = {'name': line.xpath("inv:Detalle", namespaces=namespaces)[0].text,
+                           'move_id': invoice.id,
+                           'price_unit': line.xpath("inv:PrecioUnitario", namespaces=namespaces)[0].text,
+                           'quantity': line.xpath("inv:Cantidad", namespaces=namespaces)[0].text,
+                           'product_uom_id': product_uom,
+                           'sequence': line.xpath("inv:NumeroLinea", namespaces=namespaces)[0].text,
+                           'discount': discount_percentage,
+                           'discount_note': discount_note,
+                           'product_id': inventory_product,
+                           'account_id': account_id.id,
+                           'analytic_account_id': analytic_account,
+                           'economic_activity_id': activity_id,
+                           'tax_ids': taxes}
+            else:
+                columns = {'name': line.xpath("inv:Detalle", namespaces=namespaces)[0].text,
+                           'move_id': invoice.id,
+                           'price_unit': line.xpath("inv:PrecioUnitario", namespaces=namespaces)[0].text,
+                           'quantity': line.xpath("inv:Cantidad", namespaces=namespaces)[0].text,
+                           'product_uom_id': product_uom,
+                           'sequence': line.xpath("inv:NumeroLinea", namespaces=namespaces)[0].text,
+                           'discount': discount_percentage,
+                           'discount_note': discount_note,
+                           'product_id': product,
+                           'account_id': account_id.id,
+                           'analytic_account_id': analytic_account,
+                           'economic_activity_id': activity_id,
+                           'tax_ids': taxes}
             new_lines.append((0, 0, columns))
 
         invoice.invoice_line_ids = new_lines
+    if not missing_products_message == "":
+        invoice.message_post(
+            subject=_('Warning'),
+            body=missing_products_message)
 
     invoice.amount_total_electronic_invoice = invoice_xml.xpath("inv:ResumenFactura/inv:TotalComprobante",
                                                                 namespaces=namespaces)[0].text
@@ -1211,6 +1290,7 @@ def load_xml_data(invoice, load_lines, account_id, product_id=False, analytic_ac
     if tax_node:
         invoice.amount_tax_electronic_invoice = tax_node[0].text
     invoice._compute_amount()
+#    invoice.xml_loaded = True
 
 def p12_expiration_date(p12file, password):
     try:
