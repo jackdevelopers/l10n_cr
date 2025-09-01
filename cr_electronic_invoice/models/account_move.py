@@ -1213,7 +1213,7 @@ class AccountInvoiceElectronic(models.Model):
                             if inv_line.discount and price_unit > 0:
                                 total_descuento += descuento
                                 line["montoDescuento"] = descuento
-                                line["tipoDescuento"] =  inv_line.discount_type or '04'
+                                line["tipoDescuento"] =  inv_line.discount_type.code or '07'
                                 line["naturalezaDescuento"] = inv_line.discount_note or 'Descuento Comercial'
 
                             # Se generan los impuestos
