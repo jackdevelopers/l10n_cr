@@ -538,11 +538,11 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             sb.append('<MontoTotal>' + str(v['montoTotal']) + '</MontoTotal>')
             if v.get('montoDescuento'):
                 sb.append('<Descuento>')
-                sb.append('<CodigoDescuento>' + str(v['tipoDescuento']) + '</CodigoDescuento>')
-                if (v['tipoDescuento'] == 99) and v.get('naturalezaDescuento'):
-                    sb.append('<CodigoDescuentoOTRO>' + str(v['naturalezaDescuento']) + '</CodigoDescuentoOTRO>')
-                    sb.append('<NaturalezaDescuento>' + str(v['naturalezaDescuento']) + '</NaturalezaDescuento>')
                 sb.append('<MontoDescuento>' + str(v['montoDescuento']) + '</MontoDescuento>')
+                sb.append('<CodigoDescuento>' + str(v['tipoDescuento']) + '</CodigoDescuento>')
+                if (v['tipoDescuento'] == 99):
+                    sb.append('<CodigoDescuentoOTRO>' + str(v['naturalezaDescuento']) + '</CodigoDescuentoOTRO>')
+                sb.append('<NaturalezaDescuento>' + str(v['naturalezaDescuento']) + '</NaturalezaDescuento>')
                 sb.append('</Descuento>')
 
             sb.append('<SubTotal>' + str(v['subtotal']) + '</SubTotal>')
