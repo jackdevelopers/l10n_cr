@@ -380,7 +380,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             'monto': str(round(base_total + total_impuestos + totalOtrosCargos - total_iva_devuelto, 5))
         }
         # if is out_invoice or out_refund only had one payment method
-        plazo_credito = str(inv.invoice_payment_term_id and inv.invoice_payment_term_id.line_ids[0].nb_days or 0)
+        plazo_credito = str(inv.invoice_payment_term_id and inv.invoice_payment_term_id.line_ids[0].days or 0)
         cod_moneda = str(inv.currency_id.name)
         invoice_ref = inv.ref
 
