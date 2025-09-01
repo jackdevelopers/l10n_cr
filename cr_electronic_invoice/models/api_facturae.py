@@ -911,6 +911,44 @@ def consulta_clave(clave, token, tipo_ambiente):
     return response_json
 
 
+def get_economic_activities(company):
+
+    #endpoint = "https://api.hacienda.go.cr/fe/ae?identificacion=" + company.vat
+    set_param = company.env["ir.config_parameter"].sudo().set_param
+    get_param = company.env["ir.config_parameter"].sudo().get_param
+
+    url_base = get_param("url_base")
+    get_tributary_information = get_param("get_tributary_information")
+    is_gometa_api = get_param("is_gometa_api")
+
+    if get_tributary_information:
+        url_base = url_base.strip()
+        end_point = url_base + company.vat
+        headers = {
+            "content-type": "application/json",
+        }
+        if is_gometa_api:
+            end_point = end_point + '&key=' + get_param("url_key")
+
+        try:
+            response = requests.get(end_point, headers=headers, timeout=10)
+
+            ultimo_mensaje = (
+                    "Fecha/Hora: "
+                    + str(datetime.datetime.now())
+                    + ", Codigo: "
+                    + str(response.status_code)
+                    + ", Mensaje: "
+                    + str(response._content.decode())
+            )
+            set_param("ultima_respuesta", ultimo_mensaje)
+            if response.status_code in (200, 202) and len(response._content) > 0:
+                return json.loads(str(response._content, "utf-8"))
+
+        except requests.RequestException:
+            _logger.info(_("The name query service is unavailable at this moment"))
+
+
 def consulta_documentos(self, inv, env, token_m_h, date_cr, xml_firmado):
     if (inv.move_type in ['in_invoice', 'in_refund']) and (inv.tipo_documento != 'FEC'):
         clave = inv.number_electronic + "-" + inv.consecutive_number_receiver

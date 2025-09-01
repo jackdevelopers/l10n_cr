@@ -1119,14 +1119,18 @@ class AccountInvoiceElectronic(models.Model):
                     total_servicio_salon = 0.0
                     total_servicio_gravado = 0.0
                     total_servicio_exento = 0.0
+                    total_servicio_no_sujeto = 0.0
                     total_servicio_exonerado = 0.0
                     total_mercaderia_gravado = 0.0
                     total_mercaderia_exento = 0.0
                     total_mercaderia_exonerado = 0.0
+                    total_mercaderia_no_sujeto = 0.0
                     total_descuento = 0.0
                     total_impuestos = 0.0
                     base_subtotal = 0.0
                     _no_cabys_code = False
+                    _no_cabys_medical = False
+                    taxes_details = {}
 
                     for inv_line in inv.invoice_line_ids.filtered(lambda x: not x.display_type):
 
@@ -1187,19 +1191,19 @@ class AccountInvoiceElectronic(models.Model):
                                 "BaseImponible": subtotal_line,
                                 "unidadMedida": inv_line.product_uom_id and inv_line.product_uom_id.code or 'Sp'
                             }
-
                             if inv_line.product_id:
                                 line["codigo"] = inv_line.product_id.default_code or ''
                                 line["codigoProducto"] = inv_line.product_id.code or ''
 
                                 if inv_line.product_id.cabys_code:
                                     line["codigoCabys"] = inv_line.product_id.cabys_code
+
                                 elif inv_line.product_id.categ_id and inv_line.product_id.categ_id.cabys_code:
                                     line["codigoCabys"] = inv_line.product_id.categ_id.cabys_code
-                                else:
+                                else:  # if inv.tipo_documento != 'NC':
                                     _no_cabys_code = _(f'Warning!.\nLine without CABYS code: {inv_line.name}')
                                     continue
-                            else:
+                            elif inv.tipo_documento != 'NC':
                                 _no_cabys_code = _(f'Warning!.\nLine without CABYS code: {inv_line.name}')
                                 continue
 
@@ -1209,6 +1213,7 @@ class AccountInvoiceElectronic(models.Model):
                             if inv_line.discount and price_unit > 0:
                                 total_descuento += descuento
                                 line["montoDescuento"] = descuento
+                                line["tipoDescuento"] =  inv_line.discount_type or '04'
                                 line["naturalezaDescuento"] = inv_line.discount_note or 'Descuento Comercial'
 
                             # Se generan los impuestos
@@ -1276,11 +1281,7 @@ class AccountInvoiceElectronic(models.Model):
                                 line["impuestoNeto"] = round(_line_tax, 5)
 
                             # Si no hay product_uom_id se asume como Servicio
-                            if not inv_line.product_uom_id or \
-                                inv_line.product_uom_id.category_id.name in ('Service',
-                                                                             'Services',
-                                                                             'Servicio',
-                                                                             'Servicios'):
+                            if inv_line.product_id.detailed_type == 'service':
                                 if taxes:
                                     if _tax_exoneration:
                                         if _percentage_exoneration < 1:
@@ -1353,9 +1354,11 @@ class AccountInvoiceElectronic(models.Model):
                     total_servicio_gravado = round(total_servicio_gravado, 5)
                     total_servicio_exento = round(total_servicio_exento, 5)
                     total_servicio_exonerado = round(total_servicio_exonerado, 5)
+                    total_servicio_no_sujeto = round(total_servicio_no_sujeto, 5)
                     total_mercaderia_gravado = round(total_mercaderia_gravado, 5)
                     total_mercaderia_exento = round(total_mercaderia_exento, 5)
                     total_mercaderia_exonerado = round(total_mercaderia_exonerado, 5)
+                    total_mercaderia_no_sujeto = round(total_mercaderia_no_sujeto, 5)
                     total_otros_cargos = round(total_otros_cargos, 5)
                     total_iva_devuelto = round(total_iva_devuelto, 5)
                     base_subtotal = round(base_subtotal, 5)
@@ -1364,8 +1367,8 @@ class AccountInvoiceElectronic(models.Model):
                     # ESTE METODO GENERA EL XML DIRECTAMENTE DESDE PYTHON
                     xml_string_builder = api_facturae.gen_xml_v43(
                         inv, sale_conditions, total_servicio_gravado,
-                        total_servicio_exento, total_servicio_exonerado,
-                        total_mercaderia_gravado, total_mercaderia_exento,
+                        total_servicio_exento, total_servicio_no_sujeto, total_servicio_exonerado,
+                        total_mercaderia_gravado, total_mercaderia_exento, total_mercaderia_no_sujeto,
                         total_mercaderia_exonerado, total_otros_cargos, total_iva_devuelto, base_subtotal,
                         total_impuestos, total_descuento, lines,
                         otros_cargos, currency_rate, invoice_comments,
