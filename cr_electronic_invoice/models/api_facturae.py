@@ -348,8 +348,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 fecha_emision_referencia, codigo_referencia, razon_referencia, order_number='0', gln_number='0'):
 
     numero_linea = 0
-    payment_methods_id = []
-    payment_methods_amount = {}
+    payment_methods_id = {}
     tax_desgloss = {}
 
     if inv._name == 'pos.order':
@@ -357,23 +356,31 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         for payment in inv.payment_ids:
             # En caso que no tenga código definido se colocará el de efectivo para evitar rechazos de documentos
             if not payment.payment_method_id.sequence:
-                payment_methods_id.append('01')
-                if '01' in payment_methods_amount:
-                    payment_methods_amount['01'] += payment.amount
-                else:
-                    payment_methods_amount['01'] = payment.amount
+                payment_methods_id['01'] = {
+                    'codigo': '01',
+                    'monto': payment.amount,
+
+                }
             else:
                 # Se agrega el campo code en los métodos de pago de Odoo POS
-                payment_methods_id.append(str(payment.payment_method_id.sequence))
-                if str(payment.payment_method_id.sequence) in payment_methods_amount:
-                    payment_methods_amount[str(payment.payment_method_id.sequence)] += payment.amount
-                else:
-                    payment_methods_amount[str(payment.payment_method_id.sequence)] = payment.amount
+                key = (str(payment.payment_method_id.sequence))
+                if key not in payment_methods_id:
+                    payment_methods_id[key] = {
+                        'codigo': key,
+                        'monto': 0.0,
+
+                    }
+                payment_methods_id[key]['monto'] += payment.amount
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
-        payment_methods_id.append(str(inv.payment_methods_id.sequence))
-        plazo_credito = str(inv.invoice_payment_term_id and inv.invoice_payment_term_id.line_ids[0].days or 0)
+        key = (str(inv.payment_methods_id.sequence))
+        payment_methods_id[key] = {
+            'codigo': key,
+            'monto': str(round(base_total + total_impuestos + totalOtrosCargos - total_iva_devuelto, 5))
+        }
+        # if is out_invoice or out_refund only had one payment method
+        plazo_credito = str(inv.invoice_payment_term_id and inv.invoice_payment_term_id.line_ids[0].nb_days or 0)
         cod_moneda = str(inv.currency_id.name)
         invoice_ref = inv.ref
 
@@ -679,12 +686,10 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
 
     sb.append('<TotalOtrosCargos>' + str(totalOtrosCargos) + '</TotalOtrosCargos>')
 
-    payment_method_length = len(payment_methods_id)
-    for payment_method_counter in range(payment_method_length):
+    for r in payment_methods_id.values():
         sb.append('<MedioPago>')
-        sb.append('<TipoMedioPago>' + payment_methods_id[payment_method_counter] + '</TipoMedioPago>')
-        if payment_methods_amount:
-            sb.append('<TotalMedioPago>' + str(payment_methods_amount[payment_methods_id[payment_method_counter]]) + '</TotalMedioPago>')
+        sb.append('<TipoMedioPago>' + str(r['codigo']) + '</TipoMedioPago>')
+        sb.append('<TotalMedioPago>' + str(r['monto']) + '</TotalMedioPago>')
         sb.append('</MedioPago>')
 
     sb.append('<TotalComprobante>' +
