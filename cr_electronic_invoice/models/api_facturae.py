@@ -720,12 +720,6 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
                 sb.append('</CompraEntrega>')
                 sb.append('</OtroContenido>')
-            if invoice_ref:
-                sb.append('<OtroContenido>')
-                sb.append('<InformacionAdicional xmlns="https://FE-CR/DataInfo.xsd">')
-                sb.append('<OrdenCompra>' + invoice_ref + '</OrdenCompra>')
-                sb.append('</InformacionAdicional>')
-                sb.append('</OtroContenido>')
         sb.append('</Otros>')
 
     sb.append('</' + fe_enums.tagName[inv.tipo_documento] + '>')
