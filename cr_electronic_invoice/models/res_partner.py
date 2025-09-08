@@ -77,6 +77,7 @@ class PartnerElectronic(models.Model):
     date_notification = fields.Date(
         string="Last notification date"
     )
+    number_activity_id = fields.Char('Number of Activity')
 
     # -------------------------------------------------------------------------
     # ONCHANGE METHODS
@@ -152,32 +153,29 @@ class PartnerElectronic(models.Model):
     # TOOLING
     # -------------------------------------------------------------------------
 
+    @api.onchange('activity_id')
+    def _onchange_activity_id(self):
+        if self.activity_id:
+            self.number_activity_id = self.activity_id.code
+            
     def action_get_economic_activities(self):
         if self.vat:
             json_response = api_facturae.get_economic_activities(self)
+            a_codes = list([])
             _logger.debug('E-INV CR  - Economic Activities: %s', json_response)
-            if json_response["status"] == 200:
-                activities = json_response["activities"]
+            self.name = json_response["nombre"]
+            if json_response["actividades"]:
+                activities = json_response["actividades"]
                 # Activity Codes
-                a_codes = list([])
                 for activity in activities:
                     if activity["estado"] == "A":
                         a_codes.append(activity["codigo"])
-                economic_activities = self.env['economic.activity'].with_context(active_test=False).search([('code',
-                                                                                                             'in',
-                                                                                                             a_codes)])
-
-                self.economic_activities_ids = economic_activities
-                self.name = json_response["name"]
-
-                if len(a_codes) >= 1:
+                economic_activities = (self.env['economic.activity'].with_context(active_test=False).
+                                       search([('code', 'in', a_codes)]))
+                if len(economic_activities) >= 1:
                     self.activity_id = economic_activities[0]
-            else:
-                alert = {
-                    'title': json_response["status"],
-                    'message': json_response["text"]
-                }
-                return {'value': {'vat': ''}, 'warning': alert}
+                    self.economic_activities_ids = economic_activities
+                    self.number_activity_id = economic_activities[0].code
         else:
             alert = {
                 'title': 'Atención',
