@@ -29,7 +29,7 @@
                     <!--                    <div class="col-auto col-3 mw-100 mb-2" t-if="o.tipo_documento" name="tipo_documento">-->
                     <!--                        <strong>Tipo Documento:</strong>-->
                     <!--                        <p class="m-0" t-field="o.tipo_documento"/>-->
-                    <!--                    </div>-->
+                    <!--                    </div>
                     <div class="col-auto col-3 mw-100 mb-2" name="invoice_date">
                         <strong>Condición de Venta:</strong>
                         <p class="m-0" t-field="o.invoice_payment_term_id.sale_conditions_id"/>
@@ -37,7 +37,7 @@
                     <div class="col-auto col-3 mw-100 mb-2" name="invoice_date">
                         <strong>Condición de Pago:</strong>
                         <p class="m-0" t-field="o.invoice_payment_term_id"/>
-                    </div>
+                    </div>-->
 
                 </div>
 
