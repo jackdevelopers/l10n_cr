@@ -81,6 +81,7 @@
             <field name="arch" type="xml">
                 <field name="name" position="after">
                     <field name="number_electronic" readonly="1"/>
+                    <field name="number_activity_id"/>
                 </field>
                 <field name="date_order" position="after">
                     <field name="date_issuance" readonly="1"/>

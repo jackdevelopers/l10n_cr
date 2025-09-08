@@ -15,6 +15,7 @@
 
             <field name="vat" position="after">
                 <field name="identification_id"/>
+                <field name="number_activity_id"/>
                 <field name="supplier_rank" invisible="1" readonly="1"/>
             </field>
 

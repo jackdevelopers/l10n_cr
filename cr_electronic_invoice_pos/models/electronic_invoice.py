@@ -133,6 +133,11 @@ class PosOrder(models.Model):
 
     economic_activity_id = fields.Many2one("economic.activity", string="Economic Activity", )
 
+    number_activity_id = fields.Char('Number of Activity',
+                                     related="partner_id.number_activity_id",
+                                     store=True,
+                                     index=True)
+
     _sql_constraints = [
         ('number_electronic_uniq', 'unique (number_electronic)', "La clave de comprobante debe ser única"),
     ]
@@ -498,9 +503,11 @@ class PosOrder(models.Model):
                 total_servicio_gravado = 0.0
                 total_servicio_exento = 0.0
                 total_servicio_exonerado = 0.0
+                total_servicio_no_sujeto = 0.0
                 total_mercaderia_gravado = 0.0
                 total_mercaderia_exento = 0.0
                 total_mercaderia_exonerado = 0.0
+                total_mercaderia_no_sujeto = 0.0
                 total_descuento = 0.0
                 total_impuestos = 0.0
                 base_subtotal = 0.0
@@ -550,6 +557,7 @@ class PosOrder(models.Model):
                     if line.discount and price_unit > 0:
                         total_descuento += descuento
                         dline["montoDescuento"] = descuento
+                        dline["tipoDescuento"] = '07'
                         dline["naturalezaDescuento"] = 'Descuento Comercial'
 
                     taxes = dict({})
@@ -616,8 +624,8 @@ class PosOrder(models.Model):
                 doc.economic_activity_id = doc.company_id.activity_id
                 xml_string_builder = api_facturae.gen_xml_v43(
                     doc, sale_conditions, round(total_servicio_gravado, 5),
-                    round(total_servicio_exento, 5), total_servicio_exonerado,
-                    round(total_mercaderia_gravado, 5), round(total_mercaderia_exento, 5),
+                    round(total_servicio_exento, 5), round(total_servicio_no_sujeto, 5), total_servicio_exonerado,
+                    round(total_mercaderia_exento, 5),round(total_mercaderia_gravado, 5), round(total_mercaderia_no_sujeto, 5),
                     total_mercaderia_exonerado, total_otros_cargos, total_iva_devuelto, base_subtotal,
                     total_impuestos, total_descuento, lines,
                     otros_cargos, currency_rate, invoice_comments,

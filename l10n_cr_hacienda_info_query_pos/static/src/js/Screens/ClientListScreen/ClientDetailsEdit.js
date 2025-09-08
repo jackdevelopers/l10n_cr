@@ -113,7 +113,7 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                     }
                 }
                 if (!partner_found) {
-                    let host = "https://utils.jackdevelopers.com/fe/ae?"
+                    let host = "https://api.hacienda.go.cr/fe/ae?"
                     let endpoint = host + "identificacion=" + vat
                     fetch(endpoint)
                         .then(response => {
@@ -155,6 +155,7 @@ odoo.define('l10n_cr_hacienda_info_query_pos.ClientDetailsEdit', function (requi
                 this.props.partner.district_id = processedChanges.district_id;
                 this.props.partner.identification_id = processedChanges.identification_id;
                 this.props.partner.vat = processedChanges.vat;
+                this.props.partner.number_activity_id = processedChanges.number_activity_id;
                 super.saveChanges();
             }
 

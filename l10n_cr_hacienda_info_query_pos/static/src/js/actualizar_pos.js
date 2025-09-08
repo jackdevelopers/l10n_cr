@@ -21,6 +21,7 @@ function httpGet(theUrl)
             var obj = JSON.parse(xmlhttp.responseText);
             document.getElementsByName("name")[0].value = obj.nombre;
             document.getElementsByName("email")[0].value = obj.email;
+            document.getElementsByName("activity")[0].value = obj.activity;
             activity = obj.activity;
             nombre = obj.nombre;
             email = obj.email;
