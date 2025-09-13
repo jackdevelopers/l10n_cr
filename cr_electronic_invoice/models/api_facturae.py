@@ -358,7 +358,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             if not payment.payment_method_id.sequence:
                 payment_methods_id['01'] = {
                     'codigo': '01',
-                    'monto': payment.amount,
+                    'monto': abs(payment.amount),
 
                 }
             else:
@@ -370,7 +370,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                         'monto': 0.0,
 
                     }
-                payment_methods_id[key]['monto'] += payment.amount
+                payment_methods_id[key]['monto'] += abs(payment.amount)
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
@@ -404,8 +404,11 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     sb.append('<Clave>' + inv.number_electronic + '</Clave>')
     sb.append('<ProveedorSistemas>' + inv.company_id.vat  + '</ProveedorSistemas>')
     sb.append('<CodigoActividadEmisor>' + inv.economic_activity_id.code + '</CodigoActividadEmisor>')
-    if inv.tipo_documento != 'TE' and tipo_documento_referencia != '04':
-        sb.append('<CodigoActividadReceptor>' + inv.economic_activity_id.code + '</CodigoActividadReceptor>')
+    if inv.tipo_documento != 'TE' and tipo_documento_referencia != '04' and  inv.tipo_documento != 'FEE':
+        if inv.number_activity_id:
+            sb.append('<CodigoActividadReceptor>' + inv.number_activity_id + '</CodigoActividadReceptor>')
+        else:
+            sb.append('<CodigoActividadReceptor>' + inv.economic_activity_id.code + '</CodigoActividadReceptor>')
     sb.append('<NumeroConsecutivo>' + inv.number_electronic[21:41] + '</NumeroConsecutivo>')
     sb.append('<FechaEmision>' + inv.date_issuance + '</FechaEmision>')
     sb.append('<Emisor>')
@@ -455,15 +458,10 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         if receiver_company.name:
             sb.append('<Receptor>')
             sb.append('<Nombre>' + escape(str(receiver_company.name[:99])) + '</Nombre>')
-
-            if inv.tipo_documento == 'FEE' or id_code == '05':
-                if receiver_company.vat:
-                    sb.append('<IdentificacionExtranjero>' + receiver_company.vat + '</IdentificacionExtranjero>')
-            else:
-                sb.append('<Identificacion>')
-                sb.append('<Tipo>' + id_code + '</Tipo>')
-                sb.append('<Numero>' + vat + '</Numero>')
-                sb.append('</Identificacion>')
+            sb.append('<Identificacion>')
+            sb.append('<Tipo>' + id_code + '</Tipo>')
+            sb.append('<Numero>' + vat + '</Numero>')
+            sb.append('</Identificacion>')
 
             if inv.tipo_documento != 'FEE':
                 if receiver_company.state_id and \
@@ -489,14 +487,16 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                         sb.append('</Telefono>')
                     except:
                         pass
+            else :
+                sb.append('<OtrasSenasExtranjero>' + escape(str(receiver_company.street or 'NoAplica')) + '</OtrasSenasExtranjero>')
 
-                re_match = r'^(\s?[^\s,]+@[^\s,]+\.[^\s,]+\s?,)*(\s?[^\s,]+@[^\s,]+\.[^\s,]+)$'
-                match = receiver_company.email and re.match(re_match, receiver_company.email.lower())
-                if match:
-                    email_receptor = receiver_company.email
-                else:
-                    email_receptor = 'indefinido@indefinido.com'
-                sb.append('<CorreoElectronico>' + email_receptor + '</CorreoElectronico>')
+            re_match = r'^(\s?[^\s,]+@[^\s,]+\.[^\s,]+\s?,)*(\s?[^\s,]+@[^\s,]+\.[^\s,]+)$'
+            match = receiver_company.email and re.match(re_match, receiver_company.email.lower())
+            if match:
+                email_receptor = receiver_company.email
+            else:
+                email_receptor = 'indefinido@indefinido.com'
+            sb.append('<CorreoElectronico>' + email_receptor + '</CorreoElectronico>')
 
             sb.append('</Receptor>')
 
@@ -608,8 +608,9 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                                       '</MontoExoneracion>')
                             sb.append('</Exoneracion>')
                     sb.append('</Impuesto>')
-                sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
-                sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
+                if inv.tipo_documento != 'FEE':
+                    sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
+                    sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
 
             sb.append('<MontoTotalLinea>' + str(v['montoTotalLinea']) + '</MontoTotalLinea>')
             sb.append('</LineaDetalle>')
@@ -639,28 +640,31 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     sb.append('<ResumenFactura>')
     sb.append('<CodigoTipoMoneda>')
     sb.append('<CodigoMoneda>' + cod_moneda + '</CodigoMoneda>')
-    sb.append('<TipoCambio>' + str(currency_rate) + '</TipoCambio>')
+    if inv.reference_currency_rate > 0:
+        sb.append('<TipoCambio>' + str(inv.reference_currency_rate) + '</TipoCambio>')
+    else:
+        sb.append('<TipoCambio>' + str(currency_rate) + '</TipoCambio>')
     sb.append('</CodigoTipoMoneda>')
     sb.append('<TotalServGravados>' + str(total_servicio_gravado) + '</TotalServGravados>')
     sb.append('<TotalServExentos>' + str(total_servicio_exento) + '</TotalServExentos>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalServExonerado>' + str(totalServExonerado) + '</TotalServExonerado>')
-    sb.append('<TotalServNoSujeto>' + str(total_servicio_no_sujeto) + '</TotalServNoSujeto>')
+        sb.append('<TotalServNoSujeto>' + str(total_servicio_no_sujeto) + '</TotalServNoSujeto>')
 
     sb.append('<TotalMercanciasGravadas>' + str(total_mercaderia_gravado) + '</TotalMercanciasGravadas>')
     sb.append('<TotalMercanciasExentas>' + str(total_mercaderia_exento) + '</TotalMercanciasExentas>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalMercExonerada>' + str(totalMercExonerada) + '</TotalMercExonerada>')
-    sb.append('<TotalMercNoSujeta>' + str(total_mercaderia_no_sujeto) + '</TotalMercNoSujeta>')
+        sb.append('<TotalMercNoSujeta>' + str(total_mercaderia_no_sujeto) + '</TotalMercNoSujeta>')
 
     sb.append('<TotalGravado>' + str(round(total_servicio_gravado + total_mercaderia_gravado, 5)) + '</TotalGravado>')
     sb.append('<TotalExento>' + str(round(total_servicio_exento + total_mercaderia_exento, 5)) + '</TotalExento>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalExonerado>' + str(round(totalServExonerado + totalMercExonerada, 5)) + '</TotalExonerado>')
-    sb.append('<TotalNoSujeto>' + str(round(total_servicio_no_sujeto + total_mercaderia_no_sujeto, 5)) + '</TotalNoSujeto>')
+        sb.append('<TotalNoSujeto>' + str(round(total_servicio_no_sujeto + total_mercaderia_no_sujeto, 5)) + '</TotalNoSujeto>')
 
     sb.append('<TotalVenta>' +
               str(round(total_servicio_gravado +
