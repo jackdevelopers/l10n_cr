@@ -1305,7 +1305,7 @@ class AccountInvoiceElectronic(models.Model):
                                     else:
                                         if str(taxes[1]['iva_tax_code']) == '10':
                                             total_servicio_exento += base_line
-                                        if str(taxes[1]['iva_tax_code']) == '11':
+                                        elif str(taxes[1]['iva_tax_code']) == '11':
                                             total_servicio_no_sujeto += base_line
                                         else:
                                             total_servicio_gravado += base_line
@@ -1324,7 +1324,7 @@ class AccountInvoiceElectronic(models.Model):
                                     else:
                                         if str(taxes[1]['iva_tax_code']) == '10':
                                             total_mercaderia_exento += base_line
-                                        if str(taxes[1]['iva_tax_code']) == '11':
+                                        elif str(taxes[1]['iva_tax_code']) == '11':
                                             total_mercaderia_no_sujeto += base_line
                                         else:
                                             total_mercaderia_gravado += base_line

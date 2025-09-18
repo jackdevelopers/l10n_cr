@@ -519,7 +519,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<PartidaArancelaria>' + str(v['partidaArancelaria']) + '</PartidaArancelaria>')
 
             if v.get('codigoCabys'):
-                sb.append('<CodigoCABYS>' + (v['codigoCabys']) + '</CodigoCABYS>')
+                sb.append('<CodigoCABYS>' + (v.get('codigoCabys')) + '</CodigoCABYS>')
 
             if v.get('codigo'):
                 sb.append('<CodigoComercial>')
@@ -540,7 +540,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<Descuento>')
                 sb.append('<MontoDescuento>' + str(v['montoDescuento']) + '</MontoDescuento>')
                 sb.append('<CodigoDescuento>' + str(v['tipoDescuento']) + '</CodigoDescuento>')
-                if (v['tipoDescuento'] == 99):
+                if v['tipoDescuento'] == 99:
                     sb.append('<CodigoDescuentoOTRO>' + str(v['naturalezaDescuento']) + '</CodigoDescuentoOTRO>')
                 sb.append('<NaturalezaDescuento>' + str(v['naturalezaDescuento']) + '</NaturalezaDescuento>')
                 sb.append('</Descuento>')
@@ -549,11 +549,16 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
 
             # TODO: ¿qué es base imponible? ¿porqué podría ser diferente del subtotal?
             if inv.tipo_documento != 'FEE':
-                sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
+                if v.get('tipoDescuento') and v['tipoDescuento'] == '02':
+                    sb.append('<BaseImponible>' + str(v['montoTotal']) + '</BaseImponible>')
+                else:
+                    sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
+
 
             if v.get('impuesto'):
                 for (a, b) in v['impuesto'].items():
                     tax_code = str(b['iva_tax_code'])
+                    code_iva = str(b['codigo'])
                     sb.append('<Impuesto>')
                     sb.append('<Codigo>' + str(b['codigo']) + '</Codigo>')
                     if tax_code.isdigit():
@@ -561,22 +566,22 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                     sb.append('<Tarifa>' + str(b['tarifa']) + '</Tarifa>')
                     sb.append('<Monto>' + str(b['monto']) + '</Monto>')
 
-                    if tax_code in tax_desgloss:
+                    if (tax_code, code_iva) in tax_desgloss:
                         if b.get('exoneracion'):
                             if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                actual_tax_amount = tax_desgloss[tax_code][1]
+                                actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
                                 actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
-                                tax_desgloss[tax_code] = [str(b['codigo']),str(actual_tax_amount)]
+                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
                         else:
-                            actual_tax_amount = tax_desgloss[tax_code][1]
+                            actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
                             actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
-                            tax_desgloss[tax_code] = [str(b['codigo']),str(actual_tax_amount)]
+                            tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
                     else:
                         if b.get('exoneracion'):
                             if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                tax_desgloss[tax_code] = [str(b['codigo']),str(b['monto'])]
+                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
                         else:
-                            tax_desgloss[tax_code] = [str(b['codigo']),str(b['monto'])]
+                            tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
 
                     if inv.tipo_documento != 'FEE':
                         if b.get('exoneracion'):
@@ -608,8 +613,9 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                                       '</MontoExoneracion>')
                             sb.append('</Exoneracion>')
                     sb.append('</Impuesto>')
-                if inv.tipo_documento != 'FEE':
+                if inv.tipo_documento not in ('FEE','FEC', 'REP'):
                     sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
+                if inv.tipo_documento != 'FEE':
                     sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
 
             sb.append('<MontoTotalLinea>' + str(v['montoTotalLinea']) + '</MontoTotalLinea>')
@@ -670,18 +676,20 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
               str(round(total_servicio_gravado +
                         total_mercaderia_gravado +
                         total_servicio_exento +
+                        total_servicio_no_sujeto+
                         total_mercaderia_exento +
+                        total_mercaderia_no_sujeto+
                         totalServExonerado +
                         totalMercExonerada, 5)) +
               '</TotalVenta>')
     sb.append('<TotalDescuentos>' + str(round(total_descuento, 5)) + '</TotalDescuentos>')
     sb.append('<TotalVentaNeta>' + str(round(base_total, 5)) + '</TotalVentaNeta>')
     if tax_desgloss:
-        for tax_detail in tax_desgloss:
+        for (tax_code, code_iva)  in tax_desgloss:
             sb.append('<TotalDesgloseImpuesto>')
-            sb.append('<Codigo>'+str(tax_desgloss[tax_detail][0])+'</Codigo>')
-            sb.append('<CodigoTarifaIVA>'+str(tax_detail)+'</CodigoTarifaIVA>')
-            sb.append('<TotalMontoImpuesto>'+str(round(float(tax_desgloss[tax_detail][1]),5))+'</TotalMontoImpuesto>')
+            sb.append('<Codigo>'+str(code_iva)+'</Codigo>')
+            sb.append('<CodigoTarifaIVA>'+str(tax_code)+'</CodigoTarifaIVA>')
+            sb.append('<TotalMontoImpuesto>'+str(round(float(tax_desgloss[(tax_code, code_iva)][1]),5))+'</TotalMontoImpuesto>')
             sb.append('</TotalDesgloseImpuesto>')
     sb.append('<TotalImpuesto>' + str(round(total_impuestos, 5)) + '</TotalImpuesto>')
 
