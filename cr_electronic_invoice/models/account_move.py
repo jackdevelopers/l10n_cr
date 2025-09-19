@@ -1064,20 +1064,28 @@ class AccountInvoiceElectronic(models.Model):
                     else:
                         if self.company_id.currency_id.name == currency.name:
                             currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
+                            if inv.invoice_id:
+                                currency_rate = round(self.env['res.currency.rate'].search([
+                                    ('currency_id', '=', currency_obj.id),
+                                    ('name', '<=', inv.invoice_id.invoice_date)
+                                ], order='name desc', limit=1).rate, 5)
+                            else:
+                                currency_rate = round(self.env['res.currency.rate'].search([
+                                    ('currency_id', '=', currency_obj.id),
+                                    ('name', '<=', inv.invoice_date)
+                                ], order='name desc', limit=1).rate, 5)
                         else:
                             currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
-                        if inv.invoice_id:
-                            currency_rate =  round(self.env['res.currency.rate'].search([
-                                ('currency_id', '=', currency_obj.id),
-                                ('name', '<=', inv.invoice_id.invoice_date)
-                            ], order='name desc', limit=1).rate,5)
-                        else:
-                            currency_rate = round(self.env['res.currency.rate'].search([
-                                ('currency_id', '=', currency_obj.id),
-                                ('name', '<=', inv.invoice_date)
-                            ], order='name desc', limit=1).rate,5)
-
-
+                            if inv.invoice_id:
+                                currency_rate = round(self.env['res.currency.rate'].search([
+                                    ('currency_id', '=', currency_obj.id),
+                                    ('name', '<=', inv.invoice_id.invoice_date)
+                                ], order='name desc', limit=1).inverse_company_rate, 5)
+                            else:
+                                currency_rate = round(self.env['res.currency.rate'].search([
+                                    ('currency_id', '=', currency_obj.id),
+                                    ('name', '<=', inv.invoice_date)
+                                ], order='name desc', limit=1).inverse_company_rate, 5)
 
                     if (inv.invoice_id or inv.not_loaded_invoice) and \
                        inv.reference_code_id and inv.reference_document_id:
