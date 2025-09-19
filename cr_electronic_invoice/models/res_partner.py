@@ -79,6 +79,7 @@ class PartnerElectronic(models.Model):
     date_notification = fields.Date(
         string="Last notification date"
     )
+    number_activity_id = fields.Char('Number of Activity')
 
     # -------------------------------------------------------------------------
     # ONCHANGE METHODS
@@ -159,6 +160,11 @@ class PartnerElectronic(models.Model):
     # TOOLING
     # -------------------------------------------------------------------------
 
+    @api.onchange('activity_id')
+    def _onchange_activity_id(self):
+        if self.activity_id:
+            self.number_activity_id = self.activity_id.code
+            
     def action_get_economic_activities(self):
         if self.vat:
             json_response = api_facturae.get_economic_activities(self)

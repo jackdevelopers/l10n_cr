@@ -18,7 +18,8 @@
             <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='journal_id']" position="after">
-                    <button name="create_sequences" type="object" string="Crear Secuencias" attrs="{'invisible':[('FE_sequence_id','!=', False)]}"/>
+                    <button name="create_sequences" type="object" string="Crear Secuencias"
+                            attrs="{'invisible':[('FE_sequence_id','!=', False)]}"/>
                 </xpath>
                 <xpath expr="//form/sheet" position="inside">
                     <h2>Electronic Invoice</h2>
@@ -101,7 +102,8 @@
                     </div>
                 </xpath>
                 <xpath expr="//button[@name='refund']" position="after">
-                    <button name="action_invoice_sent" type="object" string="Re-send mail" attrs="{'invisible':[('state_tributacion','!=','aceptado')]}"/>
+                    <button name="action_invoice_sent" type="object" string="Re-send mail"
+                            attrs="{'invisible':[('state_tributacion','!=','aceptado')]}"/>
                 </xpath>
             </field>
         </record>
@@ -125,203 +127,224 @@
             <field name="inherit_id" ref="point_of_sale.view_pos_order_filter"/>
             <field name="arch" type="xml">
                 <filter name="order_month" position="after">
-                    <filter string="Estado Tributacion" name="order_estado_tributacion" domain="[]" context="{'group_by':'state_tributacion'}"/>
+                    <filter string="Estado Tributacion" name="order_estado_tributacion" domain="[]"
+                            context="{'group_by':'state_tributacion'}"/>
                 </filter>
             </field>
         </record>
 
         <template id="pos_order_report">
             <t t-call="web.html_container">
-            <t t-foreach="docs" t-as="o">
-                <t t-call="web.external_layout">
-                    <t t-set="address">
-                        <strong>Cliente:</strong>
-                        <address t-field="o.partner_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}' />
-                        <span t-if="o.partner_id.vat" class="mt16">
-                            Identificación: <span t-field="o.partner_id.vat"/>
-                        </span>
-                    </t>
-                    <div class="page">
-                        <h2>
-                            <span t-field="o.name"/>
-                        </h2>
-                        <div id="electronic_data" class="row mt32 mb32">
-                            <div class="col-auto col-3 mw-100 mb-2" t-if="o.number_electronic" name="number_electronic">
-                                <strong>Número Electrónico:</strong>
-                                <p class="m-0" t-field="o.number_electronic"/>
-                            </div>
-                            <div class="col-auto col-3 mw-100 mb-2" t-if="o.tipo_documento" name="tipo_documento">
-                                <strong>Tipo de Documento:</strong>
-                                <p class="m-0" t-field="o.tipo_documento"/>
-                            </div>
-                            <div class="col-auto col-3 mw-100 mb-2" t-if="o.payment_method_id" name="payment_method_id">
-                                <strong>Método de Pago:</strong>
-                                <p class="m-0" t-field="o.payment_method_id"/>
-                            </div>
-                        </div>
-                        <div id="informations" class="row mt32 mb32">
-                            <div class="col-auto col-3 mw-100 mb-2" t-if="o.pos_reference" name="reference">
-                                <strong>Referencia:</strong>
-                                <p class="m-0" t-field="o.pos_reference"/>
-                            </div>
-                            <div class="col-auto col-3 mw-100 mb-2" t-if="o.date_order" name="date_order">
-                                <strong>Fecha:</strong>
-                                <p class="m-0" t-field="o.date_order"/>
-                            </div>
-                            <div class="col-auto col-3 mw-100 mb-2" t-if="o.user_id" name="user_id">
-                                <strong>Cajero:</strong>
-                                <p class="m-0" t-field="o.user_id"/>
-                            </div>
-
-                        </div>
-                        <table class="table table-sm o_main_table" name="pos_line_table">
-                            <thead>
-                                <tr>
-                                    <th name="th_description" class="text-left">
-                                        <span>Producto</span>
-                                    </th>
-                                    <th name="th_ref" class="text-left">
-                                        <span>Ref.</span>
-                                    </th>
-                                    <th name="th_priceunit" t-attf-class="text-right {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
-                                        <span>Precio</span>
-                                    </th>
-                                    <th name="th_quantity" class="text-left">
-                                        <span>Cantidad</span>
-                                    </th>
-
-                                    <th name="th_disc" t-if="display_discount" t-attf-class="text-left {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
-                                        <span>Desc.%</span>
-                                    </th>
-                                    <th name="th_taxes" t-attf-class="text-left {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
-                                        <span>Impuestos</span>
-                                    </th>
-                                    <th name="th_subtotal" class="text-right">
-                                        <span groups="account.group_show_line_subtotals_tax_excluded">Monto</span>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="pos_line_tbody">
-                                <t t-foreach="o.lines" t-as="line">
+                <t t-foreach="docs" t-as="o">
+                    <div class="article" t-att-data-oe-model="o and o._name" t-att-data-oe-id="o and o.id"
+                         t-att-data-oe-lang="o and o.env.context.get('lang')">
+                        <div class="page">
+                            <div class="text-center">
+                                <t t-if="o.tipo_documento=='FE'">FACTURA ELECTRÓNICA</t>
+                                <t t-if="o.tipo_documento=='TE'">TIQUETE ELECTRÓNICO</t>
+                                <t t-if="o.tipo_documento=='NC'">NOTA DE CRÉDITO ELECTRÓNICA</t>
+                                <br/>
+                                Versión Documento: 4.3
+                                <br/>
+                                <h2 t-esc="o.user_id.company_id.commercial_name"/>
+                                <t t-esc="o.user_id.company_id.name"/>
+                                <br/>
+                                Cédula:
+                                <t t-esc="o.user_id.company_id.vat"/>
+                                <br/>
+                                Teléfono:
+                                <t t-esc="o.user_id.company_id.phone"/>
+                                <br/>
+                                <t t-esc="o.user_id.company_id.email"/>
+                                <br/>
+                                <br/>
+                                <table class="text-center">
                                     <tr>
-                                        <td class="text-left">
-                                            <span t-field="line.full_product_name"/>
+                                        <td>Clave Numérica:</td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <t t-esc="o.number_electronic[0:25]"/>
                                         </td>
-                                        <td class="text-left">
-                                            <span t-field="line.default_code"/>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <t t-esc="o.number_electronic[25:]"/>
                                         </td>
-                                        <td t-attf-class="text-right {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
-                                            <span class="text-nowrap" t-field="line.price_unit"/>
-                                        </td>
-                                        <td class="text-left">
-                                            <span t-field="line.qty"/>
-                                            <span t-field="line.product_uom_id" groups="uom.group_uom"/>
-                                        </td>
-                                        <td t-if="display_discount" t-attf-class="text-left {{ 'd-none d-md-table-cell' if report_type == 'html' else '' }}">
-                                            <span class="text-nowrap" t-field="line.discount"/>
-                                        </td>
-                                        <td class="text-left">
-                                            <span t-esc="', '.join(map(lambda x: (x.description or x.name), line.tax_ids))" id="line_tax_ids"/>
-                                        </td>
-                                        <td class="text-right o_price_total">
-                                            <span class="text-nowrap" t-field="line.price_subtotal" groups="account.group_show_line_subtotals_tax_excluded"/>
+                                    </tr>
+                                </table>
+                            </div>
+                            <br/>
+                            <table>
+                                <tr>
+                                    <td>Consecutivo:</td>
+                                    <td>
+                                        <t t-esc="o.number_electronic[21:41]"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Cajero:</td>
+                                    <td>
+                                        <span t-field="o.user_id"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Fecha:</td>
+                                    <td>
+                                        <span t-field="o.date_order"/>
+                                    </td>
+                                </tr>
+                                <t t-if="o.partner_id">
+                                    <tr>
+                                        <td>Cliente:</td>
+                                        <td>
+                                            <span t-field="o.partner_id.name"/>
                                         </td>
                                     </tr>
                                 </t>
-                            </tbody>
-                        </table>
+                                <t t-if="o.partner_id.vat">
+                                    <tr>
+                                        <td>Cédula:</td>
+                                        <td>
+                                            <span t-field="o.partner_id.vat"/>
+                                            <br/>
+                                        </td>
+                                    </tr>
+                                </t>
+                            </table>
 
-                        <div class="clearfix">
-                            <div id="total" class="row" name="total">
-                                <div t-attf-class="#{'col-6' if report_type != 'html' else 'col-sm-7 col-md-6'} ml-auto">
-                                    <table class="table table-sm">
+                            <div class="row">
+                            </div>
 
-                                        <tr class="border-black o_subtotal">
-                                            <td>Impuestos</td>
-                                            <td class="text-right">
-                                                <span t-att-class="oe_subtotal_footer_separator" t-field="o.amount_tax"
-                                                />
-                                            </td>
-                                        </tr>
+                            <table class="table table-condensed">
+                                <thead>
+                                    <tr>
+                                        <th>Descripción</th>
+                                        <th class="text-right">Cant</th>
+                                        <th class="text-right">Precio</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="o.lines" t-as="line">
+                                        <td>
+                                            <span t-field="line.product_id"/>
+                                        </td>
+                                        <td class="text-right">
+                                            <t t-if="o.state != 'cancel' and o.payment_ids">
+                                                <span t-field="line.qty"/>
+                                            </t>
+                                        </td>
+                                        <td class="text-right">
+                                            <t t-if="o.state != 'cancel' and o.payment_ids">
+                                                <span t-esc="line.price_subtotal_incl"/>
+                                            </t>
+                                            <t t-if="line.discount != 0.0">
+                                                <span t-esc="line.discount"/>
+                                                %
+                                            </t>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2">
+                                            <strong>Total</strong>
+                                        </td>
+                                        <td class="text-right">
+                                            <strong t-esc="o.amount_total"/>
+                                        </td>
+                                    </tr>
+                                    <tr class="border-black">
+                                        <td colspan="2">
+                                            <strong>IVA y Servicio incluidos</strong>
+                                        </td>
+                                        <td class="text-right">
+                                            <strong t-esc="o.amount_tax"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
 
-                                        <tr class="border-black o_total">
-                                            <td>Total</td>
-                                            <td class="text-right">
-                                                <span
-                                                    t-field="o.amount_total"
-                                                />
-                                            </td>
-                                        </tr>
-
-                                        <tr class="border-black o_total">
-                                            <td>Total Pagado (con redondeo)</td>
-                                            <td class="text-right">
-                                                <span t-field="o.amount_paid"/>
-                                            </td>
-                                        </tr>
-
-                                    </table>
-                                </div>
+                            <table class="table table-condensed">
+                                <thead>
+                                    <tr>
+                                        <th>Pago</th>
+                                        <th>Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="o.payment_ids" t-as="d">
+                                        <td>
+                                            <span t-esc="d.payment_method_id.name"/>
+                                        </td>
+                                        <td>
+                                            <span t-esc="d.amount"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div style="text-align:center">
+                                Res DGT-R-033-2019 del 20 / 06 / 2019
                             </div>
                         </div>
-
                     </div>
                 </t>
             </t>
-        </t>
         </template>
 
-<report id="pos_orders" model="pos.order" string="PosOrders" report_type="qweb-pdf" name="cr_electronic_invoice_pos.pos_order_report" file="cr_electronic_invoice_pos.pos_order_report" attachment_use="True" attachment="(object.state in ('paid','done','invoiced')) and ('FE_'+(object.number_electronic or '').replace('/','')+'.pdf')" />
+        <report id="pos_orders" model="pos.order" string="PosOrders" report_type="qweb-pdf"
+                name="cr_electronic_invoice_pos.pos_order_report" file="cr_electronic_invoice_pos.pos_order_report"
+                attachment_use="True"
+                attachment="(object.state in ('paid','done','invoiced')) and ('FE_'+(object.number_electronic or '').replace('/','')+'.pdf')"/>
 
-<record id="paperformat_posreceipt" model="report.paperformat">
-<field name="name">Point Of Sale Receipt</field>
-<field name="default" eval="True"/>
-<field name="format">custom</field>
-<field name="page_height">150</field>
-<field name="page_width">60</field>
-<field name="orientation">Portrait</field>
-<field name="margin_top">3</field>
-<field name="margin_bottom">3</field>
-<field name="margin_left">3</field>
-<field name="margin_right">3</field>
-<field name="header_line" eval="False" />
-<field name="header_spacing">3</field>
-<field name="dpi">130</field>
-</record>
+        <record id="paperformat_posreceipt" model="report.paperformat">
+            <field name="name">Point Of Sale Receipt</field>
+            <field name="default" eval="True"/>
+            <field name="format">custom</field>
+            <field name="page_height">150</field>
+            <field name="page_width">60</field>
+            <field name="orientation">Portrait</field>
+            <field name="margin_top">3</field>
+            <field name="margin_bottom">3</field>
+            <field name="margin_left">3</field>
+            <field name="margin_right">3</field>
+            <field name="header_line" eval="False"/>
+            <field name="header_spacing">3</field>
+            <field name="dpi">130</field>
+        </record>
 
-<!-- Mail template are declared in a NOUPDATE block
-         so users can freely customize/delete them -->
-<!--Email template -->
-<record id="email_template_pos_invoice" model="mail.template">
-<field name="name">POS Invoice - Send by Email</field>
-<field name="email_from">{{(object.user_id.email or object.company_id.email or 'noreply@localhost')}}</field>
-<field name="subject">{{object.company_id.name}} Factura (Ref {{ object.name or 'n/a' }})</field>
-<field name="partner_to">{{object.partner_id.id}}</field>
-<field name="model_id" ref="point_of_sale.model_pos_order"/>
-<field name="auto_delete" eval="True"/>
-<field name="report_template" ref="cr_electronic_invoice_pos.pos_orders"/>
-<field name="report_name">FE_{{(object.number_electronic or '').replace('/','_')}}_{{object.state == 'draft' and 'draft' or ''}}</field>
-<field name="lang">{{object.partner_id.lang}}</field>
-<field name="body_html"><![CDATA[
-<div style="font-family: 'Lucica Grande', Ubuntu, Arial, Verdana, sans-serif; font-size: 12px; color: #222222; background-color: #FFF; ">
-Hola,
-        <br><br>
-    Su Factura <strong t-out="object.name or ''" style="box-sizing:border-box;font-weight:500;" contenteditable="false" oe-keep-contenteditable="">S00049</strong> con importe <strong t-out="format_amount(object.amount_total, object.currency_id) or ''" style="box-sizing:border-box;font-weight:500;" contenteditable="false" oe-keep-contenteditable="">$ 10.00</strong>
-  <br><br>
-   ¡Gracias por su confianza!
+        <!-- Mail template are declared in a NOUPDATE block
+                 so users can freely customize/delete them -->
+        <!--Email template -->
+        <record id="email_template_pos_invoice" model="mail.template">
+            <field name="name">POS Invoice - Send by Email</field>
+            <field name="email_from">{{(object.user_id.email or object.company_id.email or 'noreply@localhost')}}
+            </field>
+            <field name="subject">{{object.company_id.name}} Invoice (Ref {{object.number or 'n/a'}})</field>
+            <field name="partner_to">{{object.partner_id.id}}</field>
+            <field name="model_id" ref="point_of_sale.model_pos_order"/>
+            <field name="auto_delete" eval="True"/>
+            <field name="report_template" ref="cr_electronic_invoice_pos.pos_orders"/>
+            <field name="report_name">FE_{{(object.number_electronic or '').replace('/','_')}}_{{object.state == 'draft'
+                and 'draft' or ''}}
+            </field>
+            <field name="lang">{{object.partner_id.lang}}</field>
+            <field name="body_html"><![CDATA[
+                <div style="font-family: 'Lucica Grande', Ubuntu, Arial, Verdana, sans-serif; font-size: 12px; color: #222222; background-color: #FFF; ">
+                Hola,
+                <br><br>
+                Su Factura <strong t-out="object.name or ''" style="box-sizing:border-box;font-weight:500;" contenteditable="false">S00049</strong> con importe <strong t-out="format_amount(object.amount_total, object.currency_id) or ''" style="box-sizing:border-box;font-weight:500;" contenteditable="false">$ 10.00</strong>
+                <br><br>
+                ¡Gracias por su confianza!
 
-    <br>
-    <p style="font-size:13px;color:#4e4e4e;margin:0px 0 12px 0;box-sizing:border-box;">Si tiene alguna pregunta, no dude en ponerse en contacto con nosotros.</p>
-    <p style="font-size:13px;color:#4e4e4e;margin:0px 0 12px 0;box-sizing:border-box;">Gracias por escoger  <strong t-out="object.company_id.name or ''" style="box-sizing:border-box;font-weight:500;" contenteditable="false" oe-keep-contenteditable="">Virtual Security Mall</strong> !</p>
-    <br>
-    <br>
-            </div>
-            
-            ]]></field>
-</record>
+                <br>
+                <p style="margin:0px 0 12px 0;box-sizing:border-box;">Si tiene alguna pregunta, no dude en ponerse en contacto con nosotros.</p>
+                <p style="margin:0px 0 12px 0;box-sizing:border-box;">Gracias por escoger  <strong t-out="object.company_id.name or ''" style="box-sizing:border-box;font-weight:500;" contenteditable="false">Alser</strong> !</p>
+                <br>
+                <br>
+            </div>]]></field>
+        </record>
 
 
-</data>
+    </data>
 
 
 </odoo>
