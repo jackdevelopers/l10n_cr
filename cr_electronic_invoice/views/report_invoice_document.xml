@@ -26,6 +26,7 @@
                     <span t-if="o.name != '/'" t-field="o.name"/>
                 </h2>
                 <div id="electronic_data" class="row mt32 mb32">
+
                     <!--                    <div class="col-auto col-3 mw-100 mb-2" t-if="o.tipo_documento" name="tipo_documento">-->
                     <!--                        <strong>Tipo Documento:</strong>-->
                     <!--                        <p class="m-0" t-field="o.tipo_documento"/>-->

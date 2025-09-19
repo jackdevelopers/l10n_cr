@@ -50,6 +50,8 @@ class PartnerElectronic(models.Model):
         }
     )
 
+    number_activity_id = fields.Char('Number of Activity')
+
     # === Exonerations fields === #
 
     has_exoneration = fields.Boolean(
@@ -149,6 +151,11 @@ class PartnerElectronic(models.Model):
         if self.exoneration_number:
             self.definir_informacion_exo(self.exoneration_number)
 
+    @api.onchange('activity_id')
+    def _onchange_activity_id(self):
+        if self.activity_id:
+            self.number_activity_id = self.activity_id.code
+
     # -------------------------------------------------------------------------
     # TOOLING
     # -------------------------------------------------------------------------
@@ -171,7 +178,7 @@ class PartnerElectronic(models.Model):
                     if activity["estado"] == "A":
                         a_codes.append(activity["codigo"])
                 economic_activities = (self.env['economic.activity'].with_context(active_test=False).
-                                       search([('code', 'in', a_codes)]))
+                                       search([('code','in',a_codes)]))
                 if len(economic_activities) >= 1:
                     self.activity_id = economic_activities[0]
                     self.economic_activities_ids = economic_activities
