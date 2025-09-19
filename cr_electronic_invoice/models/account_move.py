@@ -996,13 +996,8 @@ class AccountInvoiceElectronic(models.Model):
                         parent_id=False,
                     )
 
-                if not inv.sequence or not inv.sequence.isdigit():  # or (len(inv.number) == 10):
-                    inv.state_tributacion = 'na'
-                    _logger.info('E-INV CR - Ignored invoice:%s', inv.number_electronic)
-                    continue
-
                 _logger.debug('generate_and_send_invoices - Invoice %s / %s  -  number:%s',
-                              current_invoice, total_invoices, inv.number_electronic)
+                              current_invoice, total_invoices, inv.name)
 
                 if not inv.xml_comprobante or (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
 
@@ -1069,20 +1064,19 @@ class AccountInvoiceElectronic(models.Model):
                     else:
                         if self.company_id.currency_id.name == currency.name:
                             currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
-                            if inv.invoice_id:
-                                currency_on_date = currency_obj.with_context(date=inv.invoice_id.invoice_date)
-                                currency_rate = round(currency_on_date._get_rates(self.env.company, currency_obj)[
-                                    currency_obj.id],5)
-                            else:
-                                currency_rate = round(currency_obj.rate, 5)
                         else:
                             currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
-                            if inv.invoice_id:
-                                currency_on_date = currency_obj.with_context(date=inv.invoice_id.invoice_date)
-                                currency_rate = round(currency_on_date._get_rates(self.env.company, currency_obj)[
-                                    currency_obj.id],5)
-                            else:
-                                currency_rate = round(currency_obj.rate, 5)
+                        if inv.invoice_id:
+                            currency_rate =  round(self.env['res.currency.rate'].search([
+                                ('currency_id', '=', currency_obj.id),
+                                ('name', '<=', inv.invoice_id.invoice_date)
+                            ], order='name desc', limit=1).rate,5)
+                        else:
+                            currency_rate = round(self.env['res.currency.rate'].search([
+                                ('currency_id', '=', currency_obj.id),
+                                ('name', '<=', inv.invoice_date)
+                            ], order='name desc', limit=1).rate,5)
+
 
                     if (inv.invoice_id or inv.not_loaded_invoice) and \
                        inv.reference_code_id and inv.reference_document_id:
