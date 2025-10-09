@@ -358,7 +358,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             if not payment.payment_method_id.sequence:
                 payment_methods_id['01'] = {
                     'codigo': '01',
-                    'monto': abs(payment.amount),
+                    'monto': abs(round(payment.amount,5)),
 
 
                 }
@@ -371,7 +371,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                         'monto': 0.0,
 
                     }
-                payment_methods_id[key]['monto'] += abs(payment.amount)
+                payment_methods_id[key]['monto'] += abs(round(payment.amount,5))
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
@@ -728,13 +728,13 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<OtroTexto codigo="OC">' + str(invoice_comments) + '</OtroTexto>')
             else:
                 sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
-            if order_number:
-                sb.append('<OtroContenido>')
-                sb.append('<CompraEntrega xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org / esquemas / CompraEntrega / ">')
-                sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
-                sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
-                sb.append('</CompraEntrega>')
-                sb.append('</OtroContenido>')
+        if order_number:
+            sb.append('<OtroContenido>')
+            sb.append('<![CDATA[<CompraEntrega xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0 http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">')
+            sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
+            sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
+            sb.append('</CompraEntrega>]]>')
+            sb.append('</OtroContenido>')
         sb.append('</Otros>')
 
     sb.append('</' + fe_enums.tagName[inv.tipo_documento] + '>')
