@@ -1083,28 +1083,6 @@ class AccountInvoiceElectronic(models.Model):
                                 currency_rate = round(currency_obj.rate, 5)
                             currency_rate = round(1.0/currency_rate, 5)
 
-                        # Validate if invoice currency is the same as the company currency
-                    if currency.name == 'CRC':
-                        currency_rate = 1
-                    else:
-                        if self.company_id.currency_id.name == currency.name:
-                            currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
-                            if inv.invoice_id:
-                                currency_on_date = currency_obj.with_context(date=inv.invoice_id.invoice_date)
-                                currency_rate = round(currency_on_date._get_rates(self.env.company, currency_obj)[
-                                    currency_obj.id],5)
-                            else:
-                                currency_rate = round(currency_obj.rate, 5)
-                        else:
-                            currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
-                            if inv.invoice_id:
-                                currency_on_date = currency_obj.with_context(date=inv.invoice_id.invoice_date)
-                                currency_rate = round(currency_on_date._get_rates(self.env.company, currency_obj)[
-                                    currency_obj.id],5)
-                            else:
-                                currency_rate = round(currency_obj.rate, 5)
-
-
                     if (inv.invoice_id or inv.not_loaded_invoice) and \
                        inv.reference_code_id and inv.reference_document_id:
                         if inv.invoice_id:
