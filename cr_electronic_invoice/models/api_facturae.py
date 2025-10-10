@@ -404,8 +404,11 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     sb.append('<Clave>' + inv.number_electronic + '</Clave>')
     sb.append('<ProveedorSistemas>' + inv.company_id.vat  + '</ProveedorSistemas>')
     sb.append('<CodigoActividadEmisor>' + inv.economic_activity_id.code + '</CodigoActividadEmisor>')
-    if inv.tipo_documento != 'TE' and tipo_documento_referencia != '04':
-        sb.append('<CodigoActividadReceptor>' + inv.economic_activity_id.code + '</CodigoActividadReceptor>')
+    if inv.tipo_documento != 'TE' and tipo_documento_referencia != '04' and  inv.tipo_documento != 'FEE':
+        if inv.number_activity_id:
+            sb.append('<CodigoActividadReceptor>' + inv.number_activity_id + '</CodigoActividadReceptor>')
+        else:
+            sb.append('<CodigoActividadReceptor>' + inv.economic_activity_id.code + '</CodigoActividadReceptor>')
     sb.append('<NumeroConsecutivo>' + inv.number_electronic[21:41] + '</NumeroConsecutivo>')
     sb.append('<FechaEmision>' + inv.date_issuance + '</FechaEmision>')
     sb.append('<Emisor>')
@@ -455,15 +458,10 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         if receiver_company.name:
             sb.append('<Receptor>')
             sb.append('<Nombre>' + escape(str(receiver_company.name[:99])) + '</Nombre>')
-
-            if inv.tipo_documento == 'FEE' or id_code == '05':
-                if receiver_company.vat:
-                    sb.append('<IdentificacionExtranjero>' + receiver_company.vat + '</IdentificacionExtranjero>')
-            else:
-                sb.append('<Identificacion>')
-                sb.append('<Tipo>' + id_code + '</Tipo>')
-                sb.append('<Numero>' + vat + '</Numero>')
-                sb.append('</Identificacion>')
+            sb.append('<Identificacion>')
+            sb.append('<Tipo>' + id_code + '</Tipo>')
+            sb.append('<Numero>' + vat + '</Numero>')
+            sb.append('</Identificacion>')
 
             if inv.tipo_documento != 'FEE':
                 if receiver_company.state_id and \
@@ -549,11 +547,14 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
 
             # TODO: ¿qué es base imponible? ¿porqué podría ser diferente del subtotal?
             if inv.tipo_documento != 'FEE':
-                sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
+                if v.get('tipoDescuento') and v['tipoDescuento'] == '02':
+                    sb.append('<BaseImponible>' + str(v['montoTotal']) + '</BaseImponible>')
+                else:
+                    sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
 
-            if v.get('impuesto'):
                 for (a, b) in v['impuesto'].items():
                     tax_code = str(b['iva_tax_code'])
+                    code_iva = str(b['codigo'])
                     sb.append('<Impuesto>')
                     sb.append('<Codigo>' + str(b['codigo']) + '</Codigo>')
                     if tax_code.isdigit():
@@ -561,22 +562,22 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                     sb.append('<Tarifa>' + str(b['tarifa']) + '</Tarifa>')
                     sb.append('<Monto>' + str(b['monto']) + '</Monto>')
 
-                    if tax_code in tax_desgloss:
+                    if (tax_code, code_iva) in tax_desgloss:
                         if b.get('exoneracion'):
                             if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                actual_tax_amount = tax_desgloss[tax_code][1]
+                                actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
                                 actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
-                                tax_desgloss[tax_code] = [str(b['codigo']),str(actual_tax_amount)]
+                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
                         else:
-                            actual_tax_amount = tax_desgloss[tax_code][1]
+                            actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
                             actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
-                            tax_desgloss[tax_code] = [str(b['codigo']),str(actual_tax_amount)]
+                            tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
                     else:
                         if b.get('exoneracion'):
                             if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                tax_desgloss[tax_code] = [str(b['codigo']),str(b['monto'])]
+                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
                         else:
-                            tax_desgloss[tax_code] = [str(b['codigo']),str(b['monto'])]
+                            tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
 
                     if inv.tipo_documento != 'FEE':
                         if b.get('exoneracion'):
@@ -608,8 +609,10 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                                       '</MontoExoneracion>')
                             sb.append('</Exoneracion>')
                     sb.append('</Impuesto>')
-                sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
-                sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
+                if inv.tipo_documento not in ('FEE','FEC', 'REP'):
+                    sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
+                if inv.tipo_documento != 'FEE':
+                    sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
 
             sb.append('<MontoTotalLinea>' + str(v['montoTotalLinea']) + '</MontoTotalLinea>')
             sb.append('</LineaDetalle>')
@@ -618,7 +621,9 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     if otrosCargos:
         sb.append('<OtrosCargos>')
         for otro_cargo in otrosCargos:
-            sb.append('<TipoDocumento>' + str(otrosCargos[otro_cargo]['TipoDocumento']) + '</TipoDocumento>')
+            sb.append('<TipoDocumentoOC>' + str(otrosCargos[otro_cargo]['TipoDocumento']) + '</TipoDocumentoOC>')
+            if str(otrosCargos[otro_cargo]['TipoDocumento']) == '99':
+                sb.append('<TipoDocumentoOTROS>Reintegro de Factura</TipoDocumentoOTROS>')
 
             if otrosCargos[otro_cargo].get('NumeroIdentidadTercero'):
                 sb.append('<NumeroIdentidadTercero>' +
@@ -639,45 +644,50 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     sb.append('<ResumenFactura>')
     sb.append('<CodigoTipoMoneda>')
     sb.append('<CodigoMoneda>' + cod_moneda + '</CodigoMoneda>')
-    sb.append('<TipoCambio>' + str(currency_rate) + '</TipoCambio>')
+    if inv.reference_currency_rate > 0:
+        sb.append('<TipoCambio>' + str(inv.reference_currency_rate) + '</TipoCambio>')
+    else:
+        sb.append('<TipoCambio>' + str(currency_rate) + '</TipoCambio>')
     sb.append('</CodigoTipoMoneda>')
     sb.append('<TotalServGravados>' + str(total_servicio_gravado) + '</TotalServGravados>')
     sb.append('<TotalServExentos>' + str(total_servicio_exento) + '</TotalServExentos>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalServExonerado>' + str(totalServExonerado) + '</TotalServExonerado>')
-    sb.append('<TotalServNoSujeto>' + str(total_servicio_no_sujeto) + '</TotalServNoSujeto>')
+        sb.append('<TotalServNoSujeto>' + str(total_servicio_no_sujeto) + '</TotalServNoSujeto>')
 
     sb.append('<TotalMercanciasGravadas>' + str(total_mercaderia_gravado) + '</TotalMercanciasGravadas>')
     sb.append('<TotalMercanciasExentas>' + str(total_mercaderia_exento) + '</TotalMercanciasExentas>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalMercExonerada>' + str(totalMercExonerada) + '</TotalMercExonerada>')
-    sb.append('<TotalMercNoSujeta>' + str(total_mercaderia_no_sujeto) + '</TotalMercNoSujeta>')
+        sb.append('<TotalMercNoSujeta>' + str(total_mercaderia_no_sujeto) + '</TotalMercNoSujeta>')
 
     sb.append('<TotalGravado>' + str(round(total_servicio_gravado + total_mercaderia_gravado, 5)) + '</TotalGravado>')
     sb.append('<TotalExento>' + str(round(total_servicio_exento + total_mercaderia_exento, 5)) + '</TotalExento>')
 
     if inv.tipo_documento != 'FEE':
         sb.append('<TotalExonerado>' + str(round(totalServExonerado + totalMercExonerada, 5)) + '</TotalExonerado>')
-    sb.append('<TotalNoSujeto>' + str(round(total_servicio_no_sujeto + total_mercaderia_no_sujeto, 5)) + '</TotalNoSujeto>')
+        sb.append('<TotalNoSujeto>' + str(round(total_servicio_no_sujeto + total_mercaderia_no_sujeto, 5)) + '</TotalNoSujeto>')
 
     sb.append('<TotalVenta>' +
               str(round(total_servicio_gravado +
                         total_mercaderia_gravado +
                         total_servicio_exento +
+                        total_servicio_no_sujeto+
                         total_mercaderia_exento +
+                        total_mercaderia_no_sujeto+
                         totalServExonerado +
                         totalMercExonerada, 5)) +
               '</TotalVenta>')
     sb.append('<TotalDescuentos>' + str(round(total_descuento, 5)) + '</TotalDescuentos>')
     sb.append('<TotalVentaNeta>' + str(round(base_total, 5)) + '</TotalVentaNeta>')
     if tax_desgloss:
-        for tax_detail in tax_desgloss:
+        for (tax_code, code_iva)  in tax_desgloss:
             sb.append('<TotalDesgloseImpuesto>')
-            sb.append('<Codigo>'+str(tax_desgloss[tax_detail][0])+'</Codigo>')
-            sb.append('<CodigoTarifaIVA>'+str(tax_detail)+'</CodigoTarifaIVA>')
-            sb.append('<TotalMontoImpuesto>'+str(round(float(tax_desgloss[tax_detail][1]),5))+'</TotalMontoImpuesto>')
+            sb.append('<Codigo>'+str(code_iva)+'</Codigo>')
+            sb.append('<CodigoTarifaIVA>'+str(tax_code)+'</CodigoTarifaIVA>')
+            sb.append('<TotalMontoImpuesto>'+str(round(float(tax_desgloss[(tax_code, code_iva)][1]),5))+'</TotalMontoImpuesto>')
             sb.append('</TotalDesgloseImpuesto>')
     sb.append('<TotalImpuesto>' + str(round(total_impuestos, 5)) + '</TotalImpuesto>')
 
@@ -713,13 +723,13 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<OtroTexto codigo="OC">' + str(invoice_comments) + '</OtroTexto>')
             else:
                 sb.append('<OtroTexto>' + str(invoice_comments) + '</OtroTexto>')
-            if order_number:
-                sb.append('<OtroContenido>')
-                sb.append('<CompraEntrega xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org / esquemas / CompraEntrega / ">')
-                sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
-                sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
-                sb.append('</CompraEntrega>')
-                sb.append('</OtroContenido>')
+        if order_number:
+            sb.append('<OtroContenido>')
+            sb.append('<![CDATA[<CompraEntrega xsi:schemaLocation="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0 http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0.xsd" xmlns="http://www.gs1cr.org/esquemas/CompraEntrega/CR_GS1_CompraEntrega_V3_0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">')
+            sb.append('<NumeroOrden>' + str(order_number) + '</NumeroOrden>')
+            sb.append('<EnviarGLN>' + str(gln_number) + '</EnviarGLN>')
+            sb.append('</CompraEntrega>]]>')
+            sb.append('</OtroContenido>')
         sb.append('</Otros>')
 
     sb.append('</' + fe_enums.tagName[inv.tipo_documento] + '>')

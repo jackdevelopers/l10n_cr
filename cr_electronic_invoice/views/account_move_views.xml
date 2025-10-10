@@ -104,6 +104,7 @@
                             <group string="Electronic Document Reference" name="eref_info_group1" colspan="2">
                                 <field name="reference_code_id" attrs="{'readonly':[('state','!=','draft')]}"/>
                                 <field name="reference_document_id" attrs="{'readonly':[('state','!=','draft')]}"/>
+                                <field name="reference_currency_rate" attrs="{'readonly':[('state','!=','draft')]}" />
                                 <field name="invoice_id" domain="[('number_electronic', '!=', False)]" attrs="{'readonly':[('state','!=','draft')]}"/>
                                 <field name="not_loaded_invoice" attrs="{'readonly':[('state','!=','draft')], 'invisible': [('invoice_id', '!=', False)]}"/>
                                 <field name="not_loaded_invoice_date" attrs="{'readonly':[('state','!=','draft')], 'invisible': [('invoice_id', '!=', False)]}"/>

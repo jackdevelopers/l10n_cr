@@ -38,11 +38,30 @@ class AccountMoveReversal(models.TransientModel):
             type_override = 'in_invoice'
         else:
             return {**default_values}
+        
+        currency = move.currency_id
+        if currency.name == 'CRC':
+            currency_rate = 1
+        else:
+            if move.company_id.currency_id.name == currency.name:
+                currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
+                currency_rate = round(self.env['res.currency.rate'].search([
+                        ('currency_id', '=', currency_obj.id),
+                        ('name', '<=', move.invoice_date)
+                    ], order='name desc', limit=1).rate, 5)
+            else:
+                currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
+                currency_rate = round(self.env['res.currency.rate'].search([
+                        ('currency_id', '=', currency_obj.id),
+                        ('name', '<=', move.invoice_date)
+                    ], order='name desc', limit=1).rate, 5)
+                currency_rate = round(1.0 / currency_rate, 5)
 
         fe_values = {'invoice_id': move.id,
                      'tipo_documento': tipo_doc,
                      'reference_code_id': self.reference_code_id.id,
                      'reference_document_id': self.reference_document_id.id,
+                     'reference_currency_rate': currency_rate,
                      'economic_activity_id': move.economic_activity_id.id,
                      'payment_methods_id': move.payment_methods_id.id,
                      'state_tributacion': False}

@@ -231,7 +231,7 @@
                       <strong>Clave:</strong>
                       <span class="m-0" t-field="o.number_electronic"/>
                     </p>
-                    <p>  <span>Autorizada mediante resolución No MH-DGT-RES-0027-2024 del 19 de noviembre de 2024 Version 4.4s </span></p>
+                    <p>  <span>Autorizada mediante resolución No MH-DGT-RES-0027-2024 del 19 de noviembre de 2024 Version 4.4 </span></p>
                     <p t-if="o.invoice_incoterm_id" name="incoterm">
                         <strong>Incoterm: </strong><span t-field="o.invoice_incoterm_id.code"/> - <span t-field="o.invoice_incoterm_id.name"/>
                     </p>

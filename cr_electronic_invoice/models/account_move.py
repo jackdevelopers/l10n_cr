@@ -142,6 +142,7 @@ class AccountInvoiceElectronic(models.Model):
         comodel_name="reference.code",
         string="Reference code"
     )
+    reference_currency_rate = fields.Float( string='Currency rate reference' )
     reference_document_id = fields.Many2one(
         comodel_name="reference.document",
         string="Reference Document Type"
@@ -1056,11 +1057,30 @@ class AccountInvoiceElectronic(models.Model):
                     currency = inv.currency_id
                     invoice_comments = escape(cleanhtml(inv.narration)) if inv.narration else ''
                     if invoice_comments and len(invoice_comments) > 500:
-                        inv.state_tributacion = 'error'
-                        inv.message_post(
-                            subject='Error',
-                            body='Comment, Terms and Conditions or/and OtroTexto is too long, max 500 characters')
-                        continue
+                        invoice_comments = invoice_comments[:499]
+
+                    if currency.name == 'CRC':
+                        currency_rate = 1
+                    else:
+                        if self.company_id.currency_id.name == currency.name:
+                            currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
+                            if inv.invoice_id:
+                                currency_rate = round(self.env['res.currency.rate'].search([
+                                    ('currency_id', '=', currency_obj.id),
+                                    ('name', '<=', inv.invoice_id.invoice_date)
+                                ], order='name desc', limit=1).rate, 5)
+                            else:
+                                currency_rate = round(currency_obj.rate, 5)
+                        else:
+                            currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
+                            if inv.invoice_id:
+                                currency_rate = round(self.env['res.currency.rate'].search([
+                                    ('currency_id', '=', currency_obj.id),
+                                    ('name', '<=', inv.invoice_id.invoice_date)
+                                ], order='name desc', limit=1).rate, 5)
+                            else:
+                                currency_rate = round(currency_obj.rate, 5)
+                            currency_rate = round(1.0/currency_rate, 5)
 
                     if (inv.invoice_id or inv.not_loaded_invoice) and \
                        inv.reference_code_id and inv.reference_document_id:
@@ -1097,18 +1117,7 @@ class AccountInvoiceElectronic(models.Model):
                             inv.invoice_payment_term_id.sale_conditions_id.code or '01'
                     else:
                         sale_conditions = '01'
-
-                    # Validate if invoice currency is the same as the company currency
-                    if currency.name == 'CRC':
-                        currency_rate = 1
-                    else:
-                        if self.company_id.currency_id.name == currency.name:
-                            currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
-                            currency_rate = round(currency_obj.rate, 5)
-                        else:
-                            currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
-                            currency_rate = round(1.0 / currency_obj.rate, 5)
-
+                    
                     # Generamos las líneas de la factura
                     lines = dict([])
                     otros_cargos = dict([])
@@ -1130,7 +1139,6 @@ class AccountInvoiceElectronic(models.Model):
                     base_subtotal = 0.0
                     _no_cabys_code = False
                     _no_cabys_medical = False
-                    taxes_details = {}
 
                     for inv_line in inv.invoice_line_ids.filtered(lambda x: not x.display_type):
 
@@ -1195,10 +1203,10 @@ class AccountInvoiceElectronic(models.Model):
                                 line["codigo"] = inv_line.product_id.default_code or ''
                                 line["codigoProducto"] = inv_line.product_id.code or ''
 
-                                if inv_line.product_id.cabys_code:
+                                if inv_line.product_id.cabys_code and len(inv_line.product_id.cabys_code) == 13:
                                     line["codigoCabys"] = inv_line.product_id.cabys_code
 
-                                elif inv_line.product_id.categ_id and inv_line.product_id.categ_id.cabys_code:
+                                elif inv_line.product_id.categ_id and inv_line.product_id.categ_id.cabys_code and len(inv_line.product_id.cabys_code) == 13:
                                     line["codigoCabys"] = inv_line.product_id.categ_id.cabys_code
                                 else:  # if inv.tipo_documento != 'NC':
                                     _no_cabys_code = _(f'Warning!.\nLine without CABYS code: {inv_line.name}')
@@ -1281,16 +1289,19 @@ class AccountInvoiceElectronic(models.Model):
                                 line["impuestoNeto"] = round(_line_tax, 5)
 
                             # Si no hay product_uom_id se asume como Servicio
-                            if inv_line.product_id.detailed_type == 'service':
+                            codigo = str(line.get("codigoCabys", "")).zfill(13)
+                            if (inv_line.product_id and inv_line.product_id.detailed_type == 'service') or (
+                                    codigo and int(codigo[0]) > 4):
                                 if taxes:
                                     if _tax_exoneration:
                                         if _percentage_exoneration < 1:
                                             total_servicio_gravado += (base_line * (1 - _percentage_exoneration))
                                         total_servicio_exonerado += (base_line * _percentage_exoneration)
-
                                     else:
                                         if str(taxes[1]['iva_tax_code']) == '10':
                                             total_servicio_exento += base_line
+                                        elif str(taxes[1]['iva_tax_code']) == '11':
+                                            total_servicio_no_sujeto += base_line
                                         else:
                                             total_servicio_gravado += base_line
 
@@ -1307,6 +1318,8 @@ class AccountInvoiceElectronic(models.Model):
                                     else:
                                         if str(taxes[1]['iva_tax_code']) == '10':
                                             total_mercaderia_exento += base_line
+                                        elif str(taxes[1]['iva_tax_code']) == '11':
+                                            total_mercaderia_no_sujeto += base_line
                                         else:
                                             total_mercaderia_gravado += base_line
 
