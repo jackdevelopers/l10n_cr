@@ -209,8 +209,9 @@ class CompanyElectronic(models.Model):
             self.message_post(subject=_('Actividades Económicas'),
                               body=_('Aviso!.\n Cargando actividades económicas desde Hacienda'))
 
-            if json_response["status"] == 200:
-                activities = json_response["activities"]
+            self.legal_name = json_response["nombre"]
+            if json_response["actividades"]:
+                activities = json_response["actividades"]
                 activities_codes = list([])
                 for activity in activities:
                     if activity["estado"] == "A":
@@ -221,14 +222,6 @@ class CompanyElectronic(models.Model):
 
                 for activity in economic_activities:
                     activity.active = True
-
-                self.legal_name = json_response["name"]
-            else:
-                alert = {
-                    'title': json_response["status"],
-                    'message': json_response["text"]
-                }
-                return {'value': {'vat': ''}, 'warning': alert}
         else:
             alert = {
                 'title': 'Atención',

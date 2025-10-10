@@ -358,7 +358,8 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             if not payment.payment_method_id.sequence:
                 payment_methods_id['01'] = {
                     'codigo': '01',
-                    'monto': payment.amount,
+                    'monto': abs(payment.amount),
+
 
                 }
             else:
@@ -370,7 +371,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                         'monto': 0.0,
 
                     }
-                payment_methods_id[key]['monto'] += payment.amount
+                payment_methods_id[key]['monto'] += abs(payment.amount)
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
@@ -487,14 +488,16 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                         sb.append('</Telefono>')
                     except:
                         pass
+            else :
+                sb.append('<OtrasSenasExtranjero>' + escape(str(receiver_company.street or 'NoAplica')) + '</OtrasSenasExtranjero>')
 
-                re_match = r'^(\s?[^\s,]+@[^\s,]+\.[^\s,]+\s?,)*(\s?[^\s,]+@[^\s,]+\.[^\s,]+)$'
-                match = receiver_company.email and re.match(re_match, receiver_company.email.lower())
-                if match:
-                    email_receptor = receiver_company.email
-                else:
-                    email_receptor = 'indefinido@indefinido.com'
-                sb.append('<CorreoElectronico>' + email_receptor + '</CorreoElectronico>')
+            re_match = r'^(\s?[^\s,]+@[^\s,]+\.[^\s,]+\s?,)*(\s?[^\s,]+@[^\s,]+\.[^\s,]+)$'
+            match = receiver_company.email and re.match(re_match, receiver_company.email.lower())
+            if match:
+                email_receptor = receiver_company.email
+            else:
+                email_receptor = 'indefinido@indefinido.com'
+            sb.append('<CorreoElectronico>' + email_receptor + '</CorreoElectronico>')
 
             sb.append('</Receptor>')
 
@@ -517,7 +520,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<PartidaArancelaria>' + str(v['partidaArancelaria']) + '</PartidaArancelaria>')
 
             if v.get('codigoCabys'):
-                sb.append('<CodigoCABYS>' + (v['codigoCabys']) + '</CodigoCABYS>')
+                sb.append('<CodigoCABYS>' + (v.get('codigoCabys')) + '</CodigoCABYS>')
 
             if v.get('codigo'):
                 sb.append('<CodigoComercial>')
@@ -538,7 +541,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<Descuento>')
                 sb.append('<MontoDescuento>' + str(v['montoDescuento']) + '</MontoDescuento>')
                 sb.append('<CodigoDescuento>' + str(v['tipoDescuento']) + '</CodigoDescuento>')
-                if (v['tipoDescuento'] == 99):
+                if v['tipoDescuento'] == 99:
                     sb.append('<CodigoDescuentoOTRO>' + str(v['naturalezaDescuento']) + '</CodigoDescuentoOTRO>')
                 sb.append('<NaturalezaDescuento>' + str(v['naturalezaDescuento']) + '</NaturalezaDescuento>')
                 sb.append('</Descuento>')

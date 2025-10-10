@@ -147,6 +147,7 @@ class AccountInvoiceElectronic(models.Model):
         comodel_name="reference.document",
         string="Reference Document Type"
     )
+    reference_currency_rate = fields.Float( string='Currency rate reference' )
     payment_methods_id = fields.Many2one(
         comodel_name="payment.methods",
         string="Payment methods"
@@ -1082,6 +1083,28 @@ class AccountInvoiceElectronic(models.Model):
                                 currency_rate = round(currency_obj.rate, 5)
                             currency_rate = round(1.0/currency_rate, 5)
 
+                        # Validate if invoice currency is the same as the company currency
+                    if currency.name == 'CRC':
+                        currency_rate = 1
+                    else:
+                        if self.company_id.currency_id.name == currency.name:
+                            currency_obj = self.env['res.currency'].search([('name', '=', 'CRC')])
+                            if inv.invoice_id:
+                                currency_on_date = currency_obj.with_context(date=inv.invoice_id.invoice_date)
+                                currency_rate = round(currency_on_date._get_rates(self.env.company, currency_obj)[
+                                    currency_obj.id],5)
+                            else:
+                                currency_rate = round(currency_obj.rate, 5)
+                        else:
+                            currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
+                            if inv.invoice_id:
+                                currency_on_date = currency_obj.with_context(date=inv.invoice_id.invoice_date)
+                                currency_rate = round(currency_on_date._get_rates(self.env.company, currency_obj)[
+                                    currency_obj.id],5)
+                            else:
+                                currency_rate = round(currency_obj.rate, 5)
+
+
                     if (inv.invoice_id or inv.not_loaded_invoice) and \
                        inv.reference_code_id and inv.reference_document_id:
                         if inv.invoice_id:
@@ -1109,7 +1132,7 @@ class AccountInvoiceElectronic(models.Model):
                             razon_referencia = inv.reference_code_id.name
                         else:
                             tipo_documento_referencia = pos_refund.refunded_order_ids[0].account_move[0].number_electronic[29:31]
-                            codigo_referencia = '03'
+                            codigo_referencia = '02'
                             razon_referencia = 'nota de credito'
 
                     if inv.invoice_payment_term_id:
@@ -1209,10 +1232,10 @@ class AccountInvoiceElectronic(models.Model):
                                 elif inv_line.product_id.categ_id and inv_line.product_id.categ_id.cabys_code and len(inv_line.product_id.cabys_code) == 13:
                                     line["codigoCabys"] = inv_line.product_id.categ_id.cabys_code
                                 else:  # if inv.tipo_documento != 'NC':
-                                    _no_cabys_code = _(f'Warning!.\nLine without CABYS code: {inv_line.name}')
+                                    _no_cabys_code = _(f'Warning!.\nLine error CABYS code: {inv_line.name}')
                                     continue
                             elif inv.tipo_documento != 'NC':
-                                _no_cabys_code = _(f'Warning!.\nLine without CABYS code: {inv_line.name}')
+                                _no_cabys_code = _(f'Warning!.\nLine error CABYS code: {inv_line.name}')
                                 continue
 
                             if inv.tipo_documento == 'FEE' and inv_line.tariff_head:
@@ -1307,7 +1330,8 @@ class AccountInvoiceElectronic(models.Model):
 
                                     total_impuestos += _line_tax
                                 else:
-                                    total_servicio_exento += base_line
+                                    _no_cabys_code = _(f'Warning!.\nLine without Tax code: {inv_line.name}')
+                                    continue
                             else:
                                 if taxes:
                                     if _tax_exoneration:
@@ -1325,7 +1349,8 @@ class AccountInvoiceElectronic(models.Model):
 
                                     total_impuestos += _line_tax
                                 else:
-                                    total_mercaderia_exento += base_line
+                                    _no_cabys_code = _(f'Warning!.\nLine without Tax code: {inv_line.name}')
+                                    continue
 
                             base_subtotal += subtotal_line
 
