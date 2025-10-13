@@ -1000,7 +1000,6 @@ class AccountInvoiceElectronic(models.Model):
                               current_invoice, total_invoices, inv.name)
 
                 if not inv.xml_comprobante or (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
-
                     if inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado':
                         msg_body = _('Another FEC is being sent because the previous one was rejected by Hacienda. ')
                         msg_body += _('Attached the previous XMLs. Previous key: ')
@@ -1052,11 +1051,7 @@ class AccountInvoiceElectronic(models.Model):
                     currency = inv.currency_id
                     invoice_comments = escape(cleanhtml(inv.narration)) if inv.narration else ''
                     if invoice_comments and len(invoice_comments) > 500:
-                        inv.state_tributacion = 'error'
-                        inv.message_post(
-                            subject='Error',
-                            body='Comment, Terms and Conditions or/and OtroTexto is too long, max 500 characters')
-                        continue
+                        invoice_comments = invoice_comments[:499]
 
                         # Validate if invoice currency is the same as the company currency
                     if currency.name == 'CRC':
@@ -1070,22 +1065,17 @@ class AccountInvoiceElectronic(models.Model):
                                     ('name', '<=', inv.invoice_id.invoice_date)
                                 ], order='name desc', limit=1).rate, 5)
                             else:
-                                currency_rate = round(self.env['res.currency.rate'].search([
-                                    ('currency_id', '=', currency_obj.id),
-                                    ('name', '<=', inv.invoice_date)
-                                ], order='name desc', limit=1).rate, 5)
+                                currency_rate = round(currency_obj.rate, 5)
                         else:
                             currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
                             if inv.invoice_id:
                                 currency_rate = round(self.env['res.currency.rate'].search([
                                     ('currency_id', '=', currency_obj.id),
                                     ('name', '<=', inv.invoice_id.invoice_date)
-                                ], order='name desc', limit=1).inverse_company_rate, 5)
+                                ], order='name desc', limit=1).rate, 5)
                             else:
-                                currency_rate = round(self.env['res.currency.rate'].search([
-                                    ('currency_id', '=', currency_obj.id),
-                                    ('name', '<=', inv.invoice_date)
-                                ], order='name desc', limit=1).inverse_company_rate, 5)
+                                currency_rate = round(currency_obj.rate, 5)
+                            currency_rate = round(1.0/currency_rate, 5)
 
                     if (inv.invoice_id or inv.not_loaded_invoice) and \
                        inv.reference_code_id and inv.reference_document_id:

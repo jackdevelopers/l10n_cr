@@ -39,7 +39,7 @@
         'data/reference_document_data.xml',
         'data/sale_conditions_data.xml',
         'data/product_category_data.xml',
-        # 'data/product_data.xml',
+        'data/product_data.xml',
         'data/uom_data.xml',
         'data/economic_activity_data.xml',
         'data/sequence.xml',

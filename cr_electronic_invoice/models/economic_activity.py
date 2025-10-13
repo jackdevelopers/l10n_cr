@@ -14,8 +14,9 @@ class EconomicActivity(models.Model):
         default=True
     )
     code = fields.Char()
-    code_uii4 = fields.Char()
     name = fields.Char()
+    code_ciiu3 = fields.Char()
+    name_ciiu3 =fields.Char()
     description = fields.Char()
 
     sale_type = fields.Selection(
