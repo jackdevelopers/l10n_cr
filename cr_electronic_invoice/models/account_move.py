@@ -332,7 +332,7 @@ class AccountInvoiceElectronic(models.Model):
                 self.economic_activities_ids = []
         else:
             self.economic_activities_ids = self.env['economic.activity'].search([('active', '=', True)])
-            self.economic_activity_id = self.company_id.activity_id
+            #self.economic_activity_id = self.company_id.activity_id
 
         if self.partner_id and self.partner_id.export:
             self.tipo_documento = 'FEE'
@@ -1470,8 +1470,8 @@ class AccountInvoiceElectronic(models.Model):
             if not vals.get('economic_activity_id'):
                 if move_type in ('in_invoice', 'in_refund') and partner_id:
                     vals['economic_activity_id'] = partner.activity_id.id
-#                elif move_type in ('out_invoice', 'out_refund') and company_id:
-#                   vals['economic_activity_id'] = company.activity_id.id
+                elif move_type in ('out_invoice', 'out_refund') and company_id:
+                    vals['economic_activity_id'] = company.activity_id.id
             if not vals.get('tipo_documento'):
                 if partner_id and partner.export:
                     vals['tipo_documento'] = 'FEE'
