@@ -310,13 +310,16 @@ class AccountInvoiceElectronic(models.Model):
             if inv.move_type in ('in_invoice', 'in_refund'):
                 if inv.partner_id:
                     inv.economic_activities_ids = inv.partner_id.economic_activities_ids if inv.partner_id.economic_activities_ids else False
-                    inv.economic_activity_id = inv.partner_id.activity_id
+                    if not inv.economic_activity_id:
+                        inv.economic_activity_id = inv.partner_id.activity_id
                 else:
-                    inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', False)])
-                    inv.economic_activity_id = inv.company_id.activity_id.id
+                    inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', True)])
+                    if not inv.economic_activity_id:
+                        inv.economic_activity_id = inv.company_id.activity_id.id
             else:
-                inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', False)])
-                inv.economic_activity_id = inv.company_id.activity_id.id
+                inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', True)])
+                if not inv.economic_activity_id:
+                    inv.economic_activity_id = inv.company_id.activity_id.id
 
     @api.onchange('partner_id')
     def _onchange_partner_id(self):
@@ -332,7 +335,7 @@ class AccountInvoiceElectronic(models.Model):
                 self.economic_activities_ids = []
         else:
             self.economic_activities_ids = self.env['economic.activity'].search([('active', '=', True)])
-            #self.economic_activity_id = self.company_id.activity_id
+            self.economic_activity_id = self.company_id.activity_id
 
         if self.partner_id and self.partner_id.export:
             self.tipo_documento = 'FEE'
