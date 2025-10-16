@@ -358,7 +358,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             if not payment.payment_method_id.sequence:
                 payment_methods_id['01'] = {
                     'codigo': '01',
-                    'monto': abs(payment.amount),
+                    'monto': abs(round(payment.amount,5)),
 
 
                 }
@@ -371,7 +371,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                         'monto': 0.0,
 
                     }
-                payment_methods_id[key]['monto'] += abs(payment.amount)
+                payment_methods_id[key]['monto'] += abs(round(payment.amount,5))
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
