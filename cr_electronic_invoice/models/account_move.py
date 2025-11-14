@@ -896,7 +896,6 @@ class AccountInvoiceElectronic(models.Model):
 
                                         self.message_post(
                                             body=message_description,
-                                            subtype='mail.mt_note',
                                             content_subtype='html')
 
                                         _logger.info(_(f'E-INV CR - Document Status:{inv.state_tributacion}'))
@@ -931,8 +930,6 @@ class AccountInvoiceElectronic(models.Model):
                     body=message,
                     subject=_('IMPORTANT NOTICE!!'),
                     message_type='notification',
-                    subtype=None,
-                    parent_id=False,
                 )
                 inv.state_tributacion = 'error'
         _logger.info('E-INV CR - _send_invoices_to_hacienda - Completed Successfully')
@@ -969,8 +966,7 @@ class AccountInvoiceElectronic(models.Model):
             self.message_post(body=message,
                               subject=_('IMPORTANT NOTICE!!'),
                               message_type='notification',
-                              subtype=None,
-                              parent_id=False)
+                              )
         _logger.info('E-INV CR - _send_invoices_to_hacienda - Completed Successfully')
 
     def generate_and_send_invoices(self, invoices):
@@ -992,8 +988,7 @@ class AccountInvoiceElectronic(models.Model):
                         body=message,
                         subject=_('IMPORTANT NOTICE!!'),
                         message_type='notification',
-                        subtype=None,
-                        parent_id=False,
+
                     )
 
                 _logger.debug('generate_and_send_invoices - Invoice %s / %s  -  number:%s',
@@ -1009,8 +1004,6 @@ class AccountInvoiceElectronic(models.Model):
                             body=msg_body + inv.number_electronic,
                             subject=_('Sending a second FEC'),
                             message_type='notification',
-                            subtype=None,
-                            parent_id=False,
                             attachments=[
                                 [
                                     fname_xml_respuesta_tributacion,

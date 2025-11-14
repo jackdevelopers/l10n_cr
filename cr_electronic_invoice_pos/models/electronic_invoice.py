@@ -591,18 +591,34 @@ class PosOrder(models.Model):
                                 }
                     dline["impuesto"] = taxes
                     dline["impuestoNeto"] = _line_tax
-                    if line.product_id and line.product_id.type == 'service':
+                    codigo = str(line.get("codigoCabys", "")).zfill(13)
+                    if (line.product_id and line.product_id.detailed_type == 'service') or (
+                            codigo and int(codigo[0]) > 4):
                         if taxes:
-                            total_servicio_gravado += base_line
+                            if str(taxes[1]['iva_tax_code']) == '10':
+                                total_servicio_exento += base_line
+                            elif str(taxes[1]['iva_tax_code']) == '11':
+                                total_servicio_no_sujeto += base_line
+                            else:
+                                total_servicio_gravado += base_line
+
                             total_impuestos += _line_tax
                         else:
-                            total_servicio_exento += base_line
+                            _no_cabys_code = _(f'Warning!.\nLine without Tax code: {line.name}')
+                            continue
                     else:
                         if taxes:
-                            total_mercaderia_gravado += base_line
+                            if str(taxes[1]['iva_tax_code']) == '10':
+                                total_mercaderia_exento += base_line
+                            elif str(taxes[1]['iva_tax_code']) == '11':
+                                total_mercaderia_no_sujeto += base_line
+                            else:
+                                total_mercaderia_gravado += base_line
+
                             total_impuestos += _line_tax
                         else:
-                            total_mercaderia_exento += base_line
+                            _no_cabys_code = _(f'Warning!.\nLine without Tax code: {line.name}')
+                            continue
                     base_subtotal += subtotal_line
                     dline["montoTotalLinea"] = round(subtotal_line + _line_tax, 5)
                     lines[line_number] = dline
