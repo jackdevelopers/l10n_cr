@@ -761,18 +761,18 @@ class AccountInvoiceElectronic(models.Model):
                             if inv.state_invoice_partner == '1':
                                 detalle_mensaje = 'Aceptado'
                                 tipo = 1
-                                tipo_documento = 'CCE'
+                                tipo_documento_aceptacion = 'CCE'
                                 sequence = inv.company_id.CCE_sequence_id.next_by_id()
 
                             elif inv.state_invoice_partner == '2':
                                 detalle_mensaje = 'Aceptado parcial'
                                 tipo = 2
-                                tipo_documento = 'CPCE'
+                                tipo_documento_aceptacion = 'CPCE'
                                 sequence = inv.company_id.CPCE_sequence_id.next_by_id()
                             else:
                                 detalle_mensaje = 'Rechazado'
                                 tipo = 3
-                                tipo_documento = 'RCE'
+                                tipo_documento_aceptacion = 'RCE'
                                 sequence = inv.company_id.RCE_sequence_id.next_by_id()
 
                             # Si el mensaje fue rechazado, necesitamos generar un nuevo id
@@ -789,7 +789,7 @@ class AccountInvoiceElectronic(models.Model):
 
                             # '''Solicitamos la clave para el Mensaje Receptor'''
                             response_json = api_facturae.get_clave_hacienda(inv,
-                                                                            tipo_documento,
+                                                                            tipo_documento_aceptacion,
                                                                             sequence,
                                                                             inv.company_id.sucursal_MR,
                                                                             inv.company_id.terminal_MR)
@@ -817,7 +817,7 @@ class AccountInvoiceElectronic(models.Model):
                                 inv.company_id.signature,
                                 inv.company_id.frm_pin, xml)
 
-                            inv.fname_xml_comprobante = tipo_documento + '_' + inv.number_electronic + '.xml'
+                            inv.fname_xml_comprobante = tipo_documento_aceptacion + '_' + inv.number_electronic + '.xml'
                             self.env['ir.attachment'].sudo().create({'name': inv.fname_xml_comprobante,
                                                                      'type': 'binary',
                                                                      'datas': base64.b64encode(xml_firmado),
@@ -827,7 +827,7 @@ class AccountInvoiceElectronic(models.Model):
                                                                      'res_name': inv.fname_xml_comprobante,
                                                                      'mimetype': 'text/xml'})
                             # inv.xml_comprobante = base64.b64encode(xml_firmado)
-                            inv.tipo_documento = tipo_documento
+                            inv.tipo_documento_aceptacion = tipo_documento_aceptacion
 
                             if inv.state_tributacion != 'procesando':
 
@@ -877,7 +877,7 @@ class AccountInvoiceElectronic(models.Model):
                                                                               inv.consecutive_number_receiver + '.xml'
                                         # file_name used to avoid: E501 line too long
                                         file_name = inv.fname_xml_respuesta_tributacion
-                                        self.env['ir.attachment'].create({'name': file_name,
+                                        self.env['ir.attachment'].sudo().create({'name': file_name,
                                                                           'type': 'binary',
                                                                           'datas': response_json.get('respuesta-xml'),
                                                                           'res_model': self._name,

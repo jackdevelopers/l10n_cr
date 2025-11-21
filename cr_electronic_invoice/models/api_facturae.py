@@ -263,7 +263,7 @@ def gen_xml_mr_43(clave, cedula_emisor, fecha_emision, id_mensaje,
     # Obtenemos el número de identificación del Emisor y lo validamos númericamente
     mr_cedula_emisor = re.sub('[^0-9]', '', cedula_emisor)
     if len(mr_cedula_emisor) != 12:
-        mr_cedula_emisor = str(mr_cedula_emisor).zfill(12)
+        mr_cedula_emisor = mr_cedula_emisor
     elif mr_cedula_emisor is None:
         raise UserError(_('La cédula del Emisor en el MR es inválida.'))
 
@@ -280,7 +280,7 @@ def gen_xml_mr_43(clave, cedula_emisor, fecha_emision, id_mensaje,
 
     mr_cedula_receptor = re.sub('[^0-9]', '', cedula_receptor)
     if len(mr_cedula_receptor) != 12:
-        mr_cedula_receptor = str(mr_cedula_receptor).zfill(12)
+        mr_cedula_receptor = mr_cedula_receptor
     elif mr_cedula_receptor is None:
         raise UserError(_('No se ha proporcionado una cédula de receptor válida para el MR.'))
 
@@ -1010,11 +1010,11 @@ def consulta_documentos(self, inv, env, token_m_h, date_cr, xml_firmado):
                                                      'mimetype': 'text/xml'})
 
     # Si fue aceptado o rechazado por haciendo se carga la respuesta
-    if (estado_m_h in ['aceptado', 'rechazado']) or (inv.move_type in ['out_invoice', 'out_refund']):
+    if (estado_m_h in ['aceptado', 'rechazado']):
         inv.fname_xml_respuesta_tributacion = 'AHC_' + inv.number_electronic + '.xml'
 
         # inv.xml_respuesta_tributacion = response_json.get('respuesta-xml')
-        self.env['ir.attachment'].create({'name': inv.fname_xml_respuesta_tributacion,
+        self.env['ir.attachment'].sudo().create({'name': inv.fname_xml_respuesta_tributacion,
                                           'type': 'binary',
                                           'datas': response_json.get('respuesta-xml'),
                                           'res_model': inv._name,
