@@ -43,16 +43,18 @@
                 </div>
 
                 <div id="informations" class="row mt-4 mb-4">
-                    <t t-set="fecha_hora" t-value="o.date_issuance"/>
-                    <t t-set="fecha" t-value="fecha_hora.split('T')[0]"/>
-                    <t t-set="hora_zona" t-value="fecha_hora.split('T')[1]"/>
-                    <t t-set="hora" t-value="hora_zona.split('-')[0]"/>
-                    <div class="col-auto col-3 mw-100 mb-2" t-if="o.invoice_date" name="invoice_date">
+                    <div class="col-auto col-3 mw-100 mb-2" t-if="o.invoice_date and o.state == 'draft' " name="invoice_date"  >
                         <strong>Invoice Date:</strong>
-                        <p class="m-0">
-                            <t t-esc="fecha"/>
-                            <t t-esc="hora"/>
-                        </p>
+                        <p class="m-0" t-field="o.invoice_date"/>
+                    </div>
+
+                    <div class="col-auto col-3 mw-100 mb-2" t-if="o.date_issuance and o.state == 'posted'" name="invoice_date">
+                      <t t-set="fecha_hora" t-value="o.date_issuance"/>
+                      <t t-set="fecha" t-value="fecha_hora.split('T')[0]" />
+                      <t t-set="hora_zona" t-value="fecha_hora.split('T')[1]" />
+                      <t t-set="hora" t-value="hora_zona.split('-')[0]" />
+                        <strong>Invoice Date:</strong>
+                        <p class="m-0"><t t-esc="fecha"/> <t t-esc="hora"/></p>
                     </div>
                     <div class="col-auto col-3 mw-100 mb-2"
                          t-if="o.invoice_date_due and o.move_type == 'out_invoice' and o.state == 'posted'"
