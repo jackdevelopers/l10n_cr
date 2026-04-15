@@ -516,7 +516,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             sb.append('<LineaDetalle>')
             sb.append('<NumeroLinea>' + str(numero_linea) + '</NumeroLinea>')
 
-            if inv.tipo_documento == 'FEE' and v.get('partidaArancelaria'):
+            if (inv.tipo_documento == 'FEE' or inv.tipo_documento == 'NC') and v.get('partidaArancelaria'):
                 sb.append('<PartidaArancelaria>' + str(v['partidaArancelaria']) + '</PartidaArancelaria>')
 
             if v.get('codigoCabys'):
