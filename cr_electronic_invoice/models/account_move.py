@@ -996,12 +996,7 @@ class AccountInvoiceElectronic(models.Model):
 
                 _logger.debug('generate_and_send_invoices - Invoice %s / %s  -  number:%s',
                               current_invoice, total_invoices, inv.name)
-                if inv.pos_order_ids:
-                    correct_number_electronic = inv.pos_order_ids.number_electronic
-                    inv.number_electronic = correct_number_electronic
-                    correct_sequence = correct_number_electronic[21:41]
-                    inv.sequence = correct_sequence
-                    inv.name = correct_sequence
+
                 if not inv.xml_comprobante or (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
                     if inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado':
                         msg_body = _('Another FEC is being sent because the previous one was rejected by Hacienda. ')
