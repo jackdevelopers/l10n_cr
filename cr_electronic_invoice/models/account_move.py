@@ -1206,7 +1206,7 @@ class AccountInvoiceElectronic(models.Model):
                                 _no_cabys_code = _(f'Warning!.\nLine error CABYS code: {inv_line.name}')
                                 continue
 
-                            if inv.tipo_documento == 'FEE' and inv_line.tariff_head:
+                            if inv_line.tariff_head:
                                 line["partidaArancelaria"] = inv_line.tariff_head
 
                             if inv_line.discount and price_unit > 0:
