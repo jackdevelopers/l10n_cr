@@ -624,8 +624,8 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         sb.append('</DetalleServicio>')
 
     if otrosCargos:
-        sb.append('<OtrosCargos>')
         for otro_cargo in otrosCargos:
+            sb.append('<OtrosCargos>')
             sb.append('<TipoDocumentoOC>' + str(otrosCargos[otro_cargo]['TipoDocumento']) + '</TipoDocumentoOC>')
             if str(otrosCargos[otro_cargo]['TipoDocumento']) == '99':
                 sb.append('<TipoDocumentoOTROS>Reintegro de Factura</TipoDocumentoOTROS>')
@@ -644,7 +644,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<Porcentaje>' + str(otrosCargos[otro_cargo]['Porcentaje']) + '</Porcentaje>')
 
             sb.append('<MontoCargo>' + str(otrosCargos[otro_cargo]['MontoCargo']) + '</MontoCargo>')
-        sb.append('</OtrosCargos>')
+            sb.append('</OtrosCargos>')
 
     sb.append('<ResumenFactura>')
     sb.append('<CodigoTipoMoneda>')
