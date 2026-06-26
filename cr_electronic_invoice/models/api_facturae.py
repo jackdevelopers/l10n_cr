@@ -263,7 +263,7 @@ def gen_xml_mr_43(clave, cedula_emisor, fecha_emision, id_mensaje,
     # Obtenemos el número de identificación del Emisor y lo validamos númericamente
     mr_cedula_emisor = re.sub('[^0-9]', '', cedula_emisor)
     if len(mr_cedula_emisor) != 12:
-        mr_cedula_emisor = str(mr_cedula_emisor).zfill(12)
+        mr_cedula_emisor = mr_cedula_emisor
     elif mr_cedula_emisor is None:
         raise UserError(_('La cédula del Emisor en el MR es inválida.'))
 
@@ -280,7 +280,7 @@ def gen_xml_mr_43(clave, cedula_emisor, fecha_emision, id_mensaje,
 
     mr_cedula_receptor = re.sub('[^0-9]', '', cedula_receptor)
     if len(mr_cedula_receptor) != 12:
-        mr_cedula_receptor = str(mr_cedula_receptor).zfill(12)
+        mr_cedula_receptor = mr_cedula_receptor
     elif mr_cedula_receptor is None:
         raise UserError(_('No se ha proporcionado una cédula de receptor válida para el MR.'))
 
@@ -404,12 +404,13 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
 
     sb.append('<Clave>' + inv.number_electronic + '</Clave>')
     sb.append('<ProveedorSistemas>' + inv.company_id.vat  + '</ProveedorSistemas>')
-    sb.append('<CodigoActividadEmisor>' + inv.economic_activity_id.code + '</CodigoActividadEmisor>')
-    if inv.tipo_documento != 'TE' and tipo_documento_referencia != '04' and  inv.tipo_documento != 'FEE':
-        if inv.number_activity_id:
-            sb.append('<CodigoActividadReceptor>' + inv.number_activity_id + '</CodigoActividadReceptor>')
-        else:
+    if inv.tipo_documento != 'FEC':
+        sb.append('<CodigoActividadEmisor>' + inv.economic_activity_id.code + '</CodigoActividadEmisor>')
+    if inv.tipo_documento not in ('TE', 'FEE') or (tipo_documento_referencia and tipo_documento_referencia != '04'):
+        if inv.tipo_documento == 'FEC':
             sb.append('<CodigoActividadReceptor>' + inv.economic_activity_id.code + '</CodigoActividadReceptor>')
+        elif inv.number_activity_id:
+            sb.append('<CodigoActividadReceptor>' + inv.number_activity_id + '</CodigoActividadReceptor>')
     sb.append('<NumeroConsecutivo>' + inv.number_electronic[21:41] + '</NumeroConsecutivo>')
     sb.append('<FechaEmision>' + inv.date_issuance + '</FechaEmision>')
     sb.append('<Emisor>')
@@ -418,18 +419,20 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     sb.append('<Tipo>' + issuing_company.identification_id.code + '</Tipo>')
     sb.append('<Numero>' + issuing_company.vat + '</Numero>')
     sb.append('</Identificacion>')
-    sb.append('<NombreComercial>' + escape(str(issuing_company.commercial_name or 'NoAplica')) + '</NombreComercial>')
-    sb.append('<Ubicacion>')
-    sb.append('<Provincia>' + issuing_company.state_id.code + '</Provincia>')
-    sb.append('<Canton>' + issuing_company.county_id.code + '</Canton>')
-    sb.append('<Distrito>' + issuing_company.district_id.code + '</Distrito>')
-
-#    if issuing_company.neighborhood_id and issuing_company.neighborhood_id.code:
-#        sb.append('<Barrio>' + str(issuing_company.neighborhood_id.code or '00') + '</Barrio>')
-
-    sb.append('<OtrasSenas>' + escape(str(issuing_company.street or 'NoAplica')) + '</OtrasSenas>')
-    sb.append('</Ubicacion>')
-
+    if inv.tipo_documento not in ('FEC'):
+        sb.append('<NombreComercial>' + escape(
+            str(issuing_company.commercial_name or escape(issuing_company_name))) + '</NombreComercial>')
+    if issuing_company.identification_id.code in ('05'):
+        sb.append('<OtrasSenasExtranjero>' + escape(
+            str(issuing_company.street or 'No Especifica')) + '</OtrasSenasExtranjero>')
+    else:
+        sb.append('<Ubicacion>')
+        if issuing_company.identification_id.code not in ('05', '06'):
+            sb.append('<Provincia>' + issuing_company.state_id.code + '</Provincia>')
+            sb.append('<Canton>' + issuing_company.county_id.code + '</Canton>')
+            sb.append('<Distrito>' + issuing_company.district_id.code + '</Distrito>')
+            sb.append('<OtrasSenas>' + escape(str(issuing_company.street or 'No Especifica')) + '</OtrasSenas>')
+        sb.append('</Ubicacion>')
     if issuing_company.phone:
         phone = phonenumbers.parse(issuing_company.phone, (issuing_company.country_id.code or 'CR'))
         sb.append('<Telefono>')
@@ -516,7 +519,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
             sb.append('<LineaDetalle>')
             sb.append('<NumeroLinea>' + str(numero_linea) + '</NumeroLinea>')
 
-            if inv.tipo_documento == 'FEE' and v.get('partidaArancelaria'):
+            if v.get('partidaArancelaria'):
                 sb.append('<PartidaArancelaria>' + str(v['partidaArancelaria']) + '</PartidaArancelaria>')
 
             if v.get('codigoCabys'):
@@ -622,8 +625,9 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         sb.append('</DetalleServicio>')
 
     if otrosCargos:
-        sb.append('<OtrosCargos>')
         for otro_cargo in otrosCargos:
+            sb.append('<OtrosCargos>')
+
             sb.append('<TipoDocumentoOC>' + str(otrosCargos[otro_cargo]['TipoDocumento']) + '</TipoDocumentoOC>')
             if str(otrosCargos[otro_cargo]['TipoDocumento']) == '99':
                 sb.append('<TipoDocumentoOTROS>Reintegro de Factura</TipoDocumentoOTROS>')
@@ -642,7 +646,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 sb.append('<Porcentaje>' + str(otrosCargos[otro_cargo]['Porcentaje']) + '</Porcentaje>')
 
             sb.append('<MontoCargo>' + str(otrosCargos[otro_cargo]['MontoCargo']) + '</MontoCargo>')
-        sb.append('</OtrosCargos>')
+            sb.append('</OtrosCargos>')
 
     sb.append('<ResumenFactura>')
     sb.append('<CodigoTipoMoneda>')
@@ -1008,11 +1012,11 @@ def consulta_documentos(self, inv, env, token_m_h, date_cr, xml_firmado):
                                                      'mimetype': 'text/xml'})
 
     # Si fue aceptado o rechazado por haciendo se carga la respuesta
-    if (estado_m_h in ['aceptado', 'rechazado']) or (inv.move_type in ['out_invoice', 'out_refund']):
+    if (estado_m_h in ['aceptado', 'rechazado']):
         inv.fname_xml_respuesta_tributacion = 'AHC_' + inv.number_electronic + '.xml'
 
         # inv.xml_respuesta_tributacion = response_json.get('respuesta-xml')
-        self.env['ir.attachment'].create({'name': inv.fname_xml_respuesta_tributacion,
+        self.env['ir.attachment'].sudo().create({'name': inv.fname_xml_respuesta_tributacion,
                                           'type': 'binary',
                                           'datas': response_json.get('respuesta-xml'),
                                           'res_model': inv._name,

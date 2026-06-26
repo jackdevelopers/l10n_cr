@@ -311,13 +311,16 @@ class AccountInvoiceElectronic(models.Model):
             if inv.move_type in ('in_invoice', 'in_refund'):
                 if inv.partner_id:
                     inv.economic_activities_ids = inv.partner_id.economic_activities_ids if inv.partner_id.economic_activities_ids else False
-                    inv.economic_activity_id = inv.partner_id.activity_id
+                    if not inv.economic_activity_id:
+                        inv.economic_activity_id = inv.partner_id.activity_id
                 else:
-                    inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', False)])
-                    inv.economic_activity_id = inv.company_id.activity_id.id
+                    inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', True)])
+                    if not inv.economic_activity_id:
+                        inv.economic_activity_id = inv.company_id.activity_id.id
             else:
-                inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', False)])
-                inv.economic_activity_id = inv.company_id.activity_id.id
+                inv.economic_activities_ids = self.env['economic.activity'].search([('active', '=', True)])
+                if not inv.economic_activity_id:
+                    inv.economic_activity_id = inv.company_id.activity_id.id
 
     @api.onchange('partner_id')
     def _onchange_partner_id(self):
@@ -504,14 +507,14 @@ class AccountInvoiceElectronic(models.Model):
         elif self.move_type == 'out_refund':
             tipo_documento = 'NC'
             sequence = self.journal_id.NC_sequence_id.next_by_id()
-
-        # Digital Supplier Invoice
-        elif self.move_type == 'in_invoice' and self.partner_id.country_id and \
-            self.partner_id.country_id.code == 'CR' and self.partner_id.identification_id and \
-                self.partner_id.vat and self.xml_supplier_approval is False:
-            tipo_documento = 'FEC'
-            sequence = self.company_id.FEC_sequence_id.next_by_id()
-
+        elif tipo_documento == 'FEC':
+            if self.move_type == 'in_invoice':
+                sequence = self.company_id.FEC_sequence_id.next_by_id()
+            else:
+                self.state_tributacion = "na"
+                self.message_post(
+                    subject=_('Warning'),
+                    body=no_sequence_message)
         return (tipo_documento, sequence)
 
     # -------------------------------------------------------------------------
@@ -759,18 +762,18 @@ class AccountInvoiceElectronic(models.Model):
                             if inv.state_invoice_partner == '1':
                                 detalle_mensaje = 'Aceptado'
                                 tipo = 1
-                                tipo_documento = 'CCE'
+                                tipo_documento_aceptacion = 'CCE'
                                 sequence = inv.company_id.CCE_sequence_id.next_by_id()
 
                             elif inv.state_invoice_partner == '2':
                                 detalle_mensaje = 'Aceptado parcial'
                                 tipo = 2
-                                tipo_documento = 'CPCE'
+                                tipo_documento_aceptacion = 'CPCE'
                                 sequence = inv.company_id.CPCE_sequence_id.next_by_id()
                             else:
                                 detalle_mensaje = 'Rechazado'
                                 tipo = 3
-                                tipo_documento = 'RCE'
+                                tipo_documento_aceptacion = 'RCE'
                                 sequence = inv.company_id.RCE_sequence_id.next_by_id()
 
                             # Si el mensaje fue rechazado, necesitamos generar un nuevo id
@@ -787,7 +790,7 @@ class AccountInvoiceElectronic(models.Model):
 
                             # '''Solicitamos la clave para el Mensaje Receptor'''
                             response_json = api_facturae.get_clave_hacienda(inv,
-                                                                            tipo_documento,
+                                                                            tipo_documento_aceptacion,
                                                                             sequence,
                                                                             inv.company_id.sucursal_MR,
                                                                             inv.company_id.terminal_MR)
@@ -815,7 +818,7 @@ class AccountInvoiceElectronic(models.Model):
                                 inv.company_id.signature,
                                 inv.company_id.frm_pin, xml)
 
-                            inv.fname_xml_comprobante = tipo_documento + '_' + inv.number_electronic + '.xml'
+                            inv.fname_xml_comprobante = tipo_documento_aceptacion + '_' + inv.number_electronic + '.xml'
                             self.env['ir.attachment'].sudo().create({'name': inv.fname_xml_comprobante,
                                                                      'type': 'binary',
                                                                      'datas': base64.b64encode(xml_firmado),
@@ -825,7 +828,7 @@ class AccountInvoiceElectronic(models.Model):
                                                                      'res_name': inv.fname_xml_comprobante,
                                                                      'mimetype': 'text/xml'})
                             # inv.xml_comprobante = base64.b64encode(xml_firmado)
-                            inv.tipo_documento = tipo_documento
+                            inv.tipo_documento_aceptacion = tipo_documento_aceptacion
 
                             if inv.state_tributacion != 'procesando':
 
@@ -875,7 +878,7 @@ class AccountInvoiceElectronic(models.Model):
                                                                               inv.consecutive_number_receiver + '.xml'
                                         # file_name used to avoid: E501 line too long
                                         file_name = inv.fname_xml_respuesta_tributacion
-                                        self.env['ir.attachment'].create({'name': file_name,
+                                        self.env['ir.attachment'].sudo().create({'name': file_name,
                                                                           'type': 'binary',
                                                                           'datas': response_json.get('respuesta-xml'),
                                                                           'res_model': self._name,
@@ -897,7 +900,6 @@ class AccountInvoiceElectronic(models.Model):
 
                                         self.message_post(
                                             body=message_description,
-                                            subtype='mail.mt_note',
                                             content_subtype='html')
 
                                         _logger.info(_(f'E-INV CR - Document Status:{inv.state_tributacion}'))
@@ -932,8 +934,6 @@ class AccountInvoiceElectronic(models.Model):
                     body=message,
                     subject=_('IMPORTANT NOTICE!!'),
                     message_type='notification',
-                    subtype=None,
-                    parent_id=False,
                 )
                 inv.state_tributacion = 'error'
         _logger.info('E-INV CR - _send_invoices_to_hacienda - Completed Successfully')
@@ -970,8 +970,7 @@ class AccountInvoiceElectronic(models.Model):
             self.message_post(body=message,
                               subject=_('IMPORTANT NOTICE!!'),
                               message_type='notification',
-                              subtype=None,
-                              parent_id=False)
+                              )
         _logger.info('E-INV CR - _send_invoices_to_hacienda - Completed Successfully')
 
     def generate_and_send_invoices(self, invoices):
@@ -993,20 +992,13 @@ class AccountInvoiceElectronic(models.Model):
                         body=message,
                         subject=_('IMPORTANT NOTICE!!'),
                         message_type='notification',
-                        subtype=None,
-                        parent_id=False,
+
                     )
 
-                if not inv.sequence or not inv.sequence.isdigit():  # or (len(inv.number) == 10):
-                    inv.state_tributacion = 'na'
-                    _logger.info('E-INV CR - Ignored invoice:%s', inv.number_electronic)
-                    continue
-
                 _logger.debug('generate_and_send_invoices - Invoice %s / %s  -  number:%s',
-                              current_invoice, total_invoices, inv.number_electronic)
+                              current_invoice, total_invoices, inv.name)
 
                 if not inv.xml_comprobante or (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
-
                     if inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado':
                         msg_body = _('Another FEC is being sent because the previous one was rejected by Hacienda. ')
                         msg_body += _('Attached the previous XMLs. Previous key: ')
@@ -1016,8 +1008,6 @@ class AccountInvoiceElectronic(models.Model):
                             body=msg_body + inv.number_electronic,
                             subject=_('Sending a second FEC'),
                             message_type='notification',
-                            subtype=None,
-                            parent_id=False,
                             attachments=[
                                 [
                                     fname_xml_respuesta_tributacion,
@@ -1216,7 +1206,7 @@ class AccountInvoiceElectronic(models.Model):
                                 _no_cabys_code = _(f'Warning!.\nLine error CABYS code: {inv_line.name}')
                                 continue
 
-                            if inv.tipo_documento == 'FEE' and inv_line.tariff_head:
+                            if inv_line.tariff_head:
                                 line["partidaArancelaria"] = inv_line.tariff_head
 
                             if inv_line.discount and price_unit > 0:
@@ -1491,21 +1481,28 @@ class AccountInvoiceElectronic(models.Model):
                         vals['tipo_documento'] = 'FE'
                 else:
                     vals['tipo_documento'] = 'TE'
+            if vals.get('ref'):
+                order = self.env['pos.order'].search([('name', '=', vals['ref'])])
+                if order and order.number_electronic:
+                    vals['tipo_documento'] = order.tipo_documento
+                    vals['number_electronic'] = order.number_electronic
+                    vals['sequence'] = order.number_electronic[21:41]
+                    vals['name'] = order.number_electronic[21:41]
         return super().create(vals_list)
 
-    def action_post(self):
+    def _post(self,soft=False):
         # Revisamos si el ambiente para Hacienda está habilitado
         for inv in self:
             if inv.move_type == 'entry':
-                super().action_post()
+                super()._post(soft=False)
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.company_id.frm_ws_ambiente == 'disabled':
-                super().action_post()
+                super()._post(soft=False)
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.tipo_documento == 'disabled':
-                super().action_post()
+                super()._post(soft=False)
                 continue
 
             if inv.partner_id.has_exoneration and inv.partner_id.date_expiration and \
@@ -1575,7 +1572,7 @@ class AccountInvoiceElectronic(models.Model):
                 if tipo_documento and sequence:
                     inv.tipo_documento = tipo_documento
                 else:
-                    super().action_post()
+                    super()._post(soft=False)
                     continue
 
             # Calcular si aplica IVA Devuelto
@@ -1601,7 +1598,7 @@ class AccountInvoiceElectronic(models.Model):
                         'quantity': 1,
                     })
 
-            super().action_post()
+            super()._post(soft=False)
             if not inv.number_electronic:
                 # if journal doesn't have sucursal use default from company
                 sucursal_id = inv.journal_id.sucursal or self.env.user.company_id.sucursal_MR

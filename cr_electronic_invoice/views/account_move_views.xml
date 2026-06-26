@@ -13,7 +13,7 @@
                         <button class="btn btn-primary" name="generate_and_send_invoice" type="object" string="Send Document"/>
                     </div>
                 </group>
-                <group attrs="{'invisible':['|', ('move_type','in', ('in_invoice', 'in_refund', 'entry')), ('tipo_documento', '=', 'disabled')]}">
+                <group attrs="{'invisible':['|', ('move_type','in', ('entry')), ('tipo_documento', '=', 'disabled')]}">
                     <div class="alert alert-warning" role="alert" attrs="{'invisible':['|', ('state_tributacion','not in', ('procesando')), ('state', 'in', ('draft', 'cancel'))]}">
                         The document was issued successfully, however we still do not have the answer, it will be consulted in 10 minutes, if you wish to consult it manually press 
                         <button class="btn btn-primary" name="action_check_hacienda" type="object" string="Consult Document"/>
