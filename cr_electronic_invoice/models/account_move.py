@@ -506,14 +506,14 @@ class AccountInvoiceElectronic(models.Model):
         elif self.move_type == 'out_refund':
             tipo_documento = 'NC'
             sequence = self.journal_id.NC_sequence_id.next_by_id()
-
-        # Digital Supplier Invoice
-        elif self.move_type == 'in_invoice' and self.partner_id.country_id and \
-            self.partner_id.country_id.code == 'CR' and self.partner_id.identification_id and \
-                self.partner_id.vat and self.xml_supplier_approval is False:
-            tipo_documento = 'FEC'
-            sequence = self.company_id.FEC_sequence_id.next_by_id()
-
+        elif tipo_documento == 'FEC':
+            if self.move_type == 'in_invoice':
+                sequence = self.company_id.FEC_sequence_id.next_by_id()
+            else:
+                self.state_tributacion = "na"
+                self.message_post(
+                    subject=_('Warning'),
+                    body=no_sequence_message)
         return (tipo_documento, sequence)
 
     # -------------------------------------------------------------------------
@@ -1482,21 +1482,28 @@ class AccountInvoiceElectronic(models.Model):
                         vals['tipo_documento'] = 'FE'
                 else:
                     vals['tipo_documento'] = 'TE'
+            if vals.get('ref'):
+                order = self.env['pos.order'].search([('name', '=', vals['ref'])])
+                if order and order.number_electronic:
+                    vals['tipo_documento'] = order.tipo_documento
+                    vals['number_electronic'] = order.number_electronic
+                    vals['sequence'] = order.number_electronic[21:41]
+                    vals['name'] = order.number_electronic[21:41]
         return super().create(vals_list)
 
-    def action_post(self):
+    def _post(self,soft=False):
         # Revisamos si el ambiente para Hacienda está habilitado
         for inv in self:
             if inv.move_type == 'entry':
-                super().action_post()
+                super()._post(soft=False)
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.company_id.frm_ws_ambiente == 'disabled':
-                super().action_post()
+                super()._post(soft=False)
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.tipo_documento == 'disabled':
-                super().action_post()
+                super()._post(soft=False)
                 continue
 
             if inv.partner_id.has_exoneration and inv.partner_id.date_expiration and \
@@ -1566,7 +1573,7 @@ class AccountInvoiceElectronic(models.Model):
                 if tipo_documento and sequence:
                     inv.tipo_documento = tipo_documento
                 else:
-                    super().action_post()
+                    super()._post(soft=False)
                     continue
 
             # Calcular si aplica IVA Devuelto
@@ -1592,7 +1599,7 @@ class AccountInvoiceElectronic(models.Model):
                         'quantity': 1,
                     })
 
-            super().action_post()
+            super()._post(soft=False)
             if not inv.number_electronic:
                 # if journal doesn't have sucursal use default from company
                 sucursal_id = inv.journal_id.sucursal or self.env.user.company_id.sucursal_MR

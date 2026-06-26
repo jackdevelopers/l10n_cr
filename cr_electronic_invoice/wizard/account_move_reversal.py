@@ -48,7 +48,7 @@ class AccountMoveReversal(models.TransientModel):
                 currency_rate = round(self.env['res.currency.rate'].search([
                         ('currency_id', '=', currency_obj.id),
                         ('name', '<=', move.invoice_date)
-                    ], order='name desc', limit=1).rate, 5)
+                    ], order='name desc', limit=1).company_rate, 5)
             else:
                 currency_obj = self.env['res.currency'].search([('name', '=', currency.name)])
                 currency_rate = round(self.env['res.currency.rate'].search([
