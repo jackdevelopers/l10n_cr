@@ -1493,7 +1493,9 @@ class AccountInvoiceElectronic(models.Model):
     def _post(self,soft=False):
         # Revisamos si el ambiente para Hacienda está habilitado
         for inv in self:
-            if inv.move_type == 'entry':
+            if inv.move_type == 'entry' and inv.state == 'posted':
+                continue
+            if inv.move_type == 'entry' and inv.state != 'posted':
                 super()._post(soft=False)
                 inv.tipo_documento = 'disabled'
                 continue
