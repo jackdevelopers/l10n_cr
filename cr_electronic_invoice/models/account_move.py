@@ -1482,7 +1482,7 @@ class AccountInvoiceElectronic(models.Model):
                 else:
                     vals['tipo_documento'] = 'TE'
             if vals.get('ref') and 'pos.order' in self.env:
-                order = self.env['pos.order'].search([('name', '=', vals['ref'])])
+                order = self.env['pos.order'].search([('name', '=', vals['ref'])], limit=1)
                 if order and order.number_electronic:
                     vals['tipo_documento'] = order.tipo_documento
                     vals['number_electronic'] = order.number_electronic
