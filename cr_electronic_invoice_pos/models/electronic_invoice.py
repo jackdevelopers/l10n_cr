@@ -591,7 +591,7 @@ class PosOrder(models.Model):
                                 }
                     dline["impuesto"] = taxes
                     dline["impuestoNeto"] = _line_tax
-                    codigo = str(line.get("codigoCabys", "")).zfill(13)
+                    codigo = str(dline.get("codigoCabys", "")).zfill(13)
                     if (line.product_id and line.product_id.detailed_type == 'service') or (
                             codigo and int(codigo[0]) > 4):
                         if taxes:
