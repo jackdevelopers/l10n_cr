@@ -641,7 +641,7 @@ class PosOrder(models.Model):
                 xml_string_builder = api_facturae.gen_xml_v43(
                     doc, sale_conditions, round(total_servicio_gravado, 5),
                     round(total_servicio_exento, 5), round(total_servicio_no_sujeto, 5), total_servicio_exonerado,
-                    round(total_mercaderia_exento, 5),round(total_mercaderia_gravado, 5), round(total_mercaderia_no_sujeto, 5),
+                    round(total_mercaderia_gravado, 5), round(total_mercaderia_exento, 5), round(total_mercaderia_no_sujeto, 5),
                     total_mercaderia_exonerado, total_otros_cargos, total_iva_devuelto, base_subtotal,
                     total_impuestos, total_descuento, lines,
                     otros_cargos, currency_rate, invoice_comments,
