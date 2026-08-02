@@ -356,22 +356,41 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         for payment in inv.payment_ids:
             # En caso que no tenga código definido se colocará el de efectivo para evitar rechazos de documentos
             if not payment.payment_method_id.sequence:
-                payment_methods_id['01'] = {
-                    'codigo': '01',
-                    'monto': abs(round(payment.amount,5)),
-
-
-                }
+                key = '01'
             else:
                 # Se agrega el campo code en los métodos de pago de Odoo POS
                 key = (str(payment.payment_method_id.sequence))
-                if key not in payment_methods_id:
-                    payment_methods_id[key] = {
-                        'codigo': key,
-                        'monto': 0.0,
+            if key not in payment_methods_id:
+                payment_methods_id[key] = {
+                    'codigo': key,
+                    'monto': 0.0,
+                }
+            # Se conserva el signo: el vuelto se registra en Odoo POS como un
+            # pago negativo (normalmente en Efectivo). Si se usara abs() aquí,
+            # el vuelto se sumaría como un pago adicional en lugar de restarse,
+            # y la suma de los medios de pago ya no cuadraría con
+            # TotalComprobante (Hacienda rechaza con el error -493).
+            payment_methods_id[key]['monto'] += round(payment.amount, 5)
 
-                    }
-                payment_methods_id[key]['monto'] += abs(round(payment.amount,5))
+        # El vuelto queda como un monto negativo (o en 0) en el medio de pago
+        # donde se entregó. Hacienda no acepta medios de pago con monto <= 0,
+        # así que ese vuelto se resta de los medios de pago con monto positivo
+        # (normalmente el medio con el que se pagó de más) hasta agotarlo, y
+        # se descartan los medios que queden en cero.
+        change_total = 0.0
+        for key in list(payment_methods_id.keys()):
+            if payment_methods_id[key]['monto'] <= 0:
+                change_total += -payment_methods_id[key]['monto']
+                del payment_methods_id[key]
+        for key in list(payment_methods_id.keys()):
+            if change_total <= 0:
+                break
+            reduction = min(change_total, payment_methods_id[key]['monto'])
+            payment_methods_id[key]['monto'] = round(payment_methods_id[key]['monto'] - reduction, 5)
+            change_total = round(change_total - reduction, 5)
+            if payment_methods_id[key]['monto'] <= 0:
+                del payment_methods_id[key]
+
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
