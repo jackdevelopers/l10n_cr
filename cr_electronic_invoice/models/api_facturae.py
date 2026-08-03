@@ -1100,6 +1100,18 @@ def send_message(inv, date_cr, xml, token, env):
     return {'status': response.status_code, 'text': response.headers.get('X-Error-Cause', 'Unknown')}
 
 
+def is_tax_assumed_by_issuer(line, tax_node, namespaces):
+    """El impuesto específico (código 05) puede venir absorbido por el fabricante/emisor,
+    señalado con el tag ImpuestoAsumidoEmisorFabrica de la línea. En ese caso no debe
+    cargarse como impuesto de la factura de proveedor porque el comprador no lo paga
+    (el monto ni siquiera forma parte del MontoTotalLinea) y tampoco trae Tarifa."""
+    tax_code = re.sub(r"[^0-9]+", "", tax_node.xpath("inv:Codigo", namespaces=namespaces)[0].text)
+    if tax_code != '05':
+        return False
+    assumed_node = line.xpath("inv:ImpuestoAsumidoEmisorFabrica", namespaces=namespaces)
+    return bool(assumed_node and float(assumed_node[0].text or '0') > 0)
+
+
 def load_xml_data(invoice, load_lines, load_product_by_code, create_partner_automatically, create_product_by_code, account_id, product_id=False, analytic_account_id=False):
     try:
         invoice_xml = etree.fromstring(base64.b64decode(invoice.xml_supplier_approval))
@@ -1275,6 +1287,8 @@ def load_xml_data(invoice, load_lines, load_product_by_code, create_partner_auto
             taxes = []
             tax_nodes = line.xpath("inv:Impuesto", namespaces=namespaces)
             for tax_node in tax_nodes:
+                if is_tax_assumed_by_issuer(line, tax_node, namespaces):
+                    continue
                 tax_code = re.sub(r"[^0-9]+", "", tax_node.xpath("inv:Codigo", namespaces=namespaces)[0].text)
                 tax_amount = float(tax_node.xpath("inv:Tarifa", namespaces=namespaces)[0].text)
                 _logger.debug('FECR - tax_code: %s', tax_code)
