@@ -577,67 +577,69 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 else:
                     sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
 
-                for (a, b) in v['impuesto'].items():
-                    tax_code = str(b['iva_tax_code'])
-                    code_iva = str(b['codigo'])
-                    sb.append('<Impuesto>')
-                    sb.append('<Codigo>' + str(b['codigo']) + '</Codigo>')
-                    if tax_code.isdigit():
-                        sb.append('<CodigoTarifaIVA>' + tax_code + '</CodigoTarifaIVA>')
-                    sb.append('<Tarifa>' + str(b['tarifa']) + '</Tarifa>')
-                    sb.append('<Monto>' + str(b['monto']) + '</Monto>')
+            # El schema v4.4 exige el tag Impuesto en cada línea también para FEE
+            # (documentos de exportación), aunque sea con Tarifa/Monto en 0.
+            for (a, b) in v['impuesto'].items():
+                tax_code = str(b['iva_tax_code'])
+                code_iva = str(b['codigo'])
+                sb.append('<Impuesto>')
+                sb.append('<Codigo>' + str(b['codigo']) + '</Codigo>')
+                if tax_code.isdigit():
+                    sb.append('<CodigoTarifaIVA>' + tax_code + '</CodigoTarifaIVA>')
+                sb.append('<Tarifa>' + str(b['tarifa']) + '</Tarifa>')
+                sb.append('<Monto>' + str(b['monto']) + '</Monto>')
 
-                    if (tax_code, code_iva) in tax_desgloss:
-                        if b.get('exoneracion'):
-                            if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
-                                actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
-                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
-                        else:
+                if (tax_code, code_iva) in tax_desgloss:
+                    if b.get('exoneracion'):
+                        if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
                             actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
                             actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
                             tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
                     else:
-                        if b.get('exoneracion'):
-                            if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
-                        else:
+                        actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
+                        actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
+                        tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
+                else:
+                    if b.get('exoneracion'):
+                        if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
                             tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
+                    else:
+                        tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
 
-                    if inv.tipo_documento != 'FEE':
-                        if b.get('exoneracion'):
-                            sb.append('<Exoneracion>')
-                            sb.append('<TipoDocumentoEX1>' +
-                                      receiver_company.type_exoneration.code +
-                                      '</TipoDocumentoEX1>')
-                            sb.append('<NumeroDocumento>' +
-                                      receiver_company.exoneration_number +
-                                      '</NumeroDocumento>')
-                            if receiver_company.type_exoneration.code in ('02', '03', '06', '07', '08'):
-                                sb.append('<Articulo>' +
-                                          "696969" +
-                                          '</Articulo>')
-                                sb.append('<Inciso>' +
-                                          "696969" +
-                                          '</Inciso>')
-                            sb.append('<NombreInstitucion>' +
-                                      receiver_company.institution_name +
-                                      '</NombreInstitucion>')
-                            sb.append('<FechaEmisionEX>' +
-                                      str(receiver_company.date_issue) + 'T00:00:00-06:00' +
-                                      '</FechaEmisionEX>')
-                            sb.append('<TarifaExonerada>' +
-                                      str(b['exoneracion']['porcentajeCompra']) +
-                                      '</TarifaExonerada>')
-                            sb.append('<MontoExoneracion>' +
-                                      str(b['exoneracion']['montoImpuesto']) +
-                                      '</MontoExoneracion>')
-                            sb.append('</Exoneracion>')
-                    sb.append('</Impuesto>')
-                if inv.tipo_documento not in ('FEE','FEC', 'REP'):
-                    sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
                 if inv.tipo_documento != 'FEE':
-                    sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
+                    if b.get('exoneracion'):
+                        sb.append('<Exoneracion>')
+                        sb.append('<TipoDocumentoEX1>' +
+                                  receiver_company.type_exoneration.code +
+                                  '</TipoDocumentoEX1>')
+                        sb.append('<NumeroDocumento>' +
+                                  receiver_company.exoneration_number +
+                                  '</NumeroDocumento>')
+                        if receiver_company.type_exoneration.code in ('02', '03', '06', '07', '08'):
+                            sb.append('<Articulo>' +
+                                      "696969" +
+                                      '</Articulo>')
+                            sb.append('<Inciso>' +
+                                      "696969" +
+                                      '</Inciso>')
+                        sb.append('<NombreInstitucion>' +
+                                  receiver_company.institution_name +
+                                  '</NombreInstitucion>')
+                        sb.append('<FechaEmisionEX>' +
+                                  str(receiver_company.date_issue) + 'T00:00:00-06:00' +
+                                  '</FechaEmisionEX>')
+                        sb.append('<TarifaExonerada>' +
+                                  str(b['exoneracion']['porcentajeCompra']) +
+                                  '</TarifaExonerada>')
+                        sb.append('<MontoExoneracion>' +
+                                  str(b['exoneracion']['montoImpuesto']) +
+                                  '</MontoExoneracion>')
+                        sb.append('</Exoneracion>')
+                sb.append('</Impuesto>')
+            if inv.tipo_documento not in ('FEE','FEC', 'REP'):
+                sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
+            if inv.tipo_documento != 'FEE':
+                sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
 
             sb.append('<MontoTotalLinea>' + str(v['montoTotalLinea']) + '</MontoTotalLinea>')
             sb.append('</LineaDetalle>')
