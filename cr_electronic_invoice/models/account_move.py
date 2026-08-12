@@ -1073,8 +1073,14 @@ class AccountInvoiceElectronic(models.Model):
                                 currency_rate = round(currency_obj.rate, 5)
                             currency_rate = round(1.0/currency_rate, 5)
 
-                    if (inv.invoice_id or inv.not_loaded_invoice) and \
-                       inv.reference_code_id and inv.reference_document_id:
+                    # Un reembolso creado desde POS (invoice_origin = nombre de la
+                    # orden) nunca trae invoice_id/not_loaded_invoice/reference_code_id/
+                    # reference_document_id, así que se habilita también por ese caso;
+                    # de lo contrario la rama que arma la referencia para NC de POS
+                    # (más abajo) nunca se ejecutaba y los campos quedaban vacíos.
+                    is_pos_refund = bool(inv.invoice_origin and inv.move_type == 'out_refund')
+                    if is_pos_refund or ((inv.invoice_id or inv.not_loaded_invoice) and \
+                       inv.reference_code_id and inv.reference_document_id):
                         if inv.invoice_id:
                             if inv.invoice_id.number_electronic and inv.invoice_line_ids[0].product_id:
                                 numero_documento_referencia = inv.invoice_id.number_electronic
@@ -1084,12 +1090,12 @@ class AccountInvoiceElectronic(models.Model):
                                     re.sub('[^0-9]+', '', inv.invoice_id.sequence) or re.sub('[^0-9]+', '', inv.invoice_id.name)
                                 invoice_date = inv.invoice_id.invoice_date
                                 fecha_emision_referencia = invoice_date.strftime("%Y-%m-%d") + "T12:00:00-06:00"
-                        elif inv.invoice_origin and inv.move_type == 'out_refund':
+                        elif is_pos_refund:
                             pos_refund = self.env['pos.order'].search([('name', '=', inv.invoice_origin)])
                             numero_documento_referencia = pos_refund.refunded_order_ids[0].account_move[0].number_electronic
                             fecha_emision_referencia = (pos_refund.refunded_order_ids[0].account_move[0].date_issuance
-                                                        or pos_refund.refunded_order_ids[0].account_move[0].invoice_date.strftime("%Y-%m-% d")
-                                                        + "T12: 00:00 - 06: 00")
+                                                        or pos_refund.refunded_order_ids[0].account_move[0].invoice_date.strftime("%Y-%m-%d")
+                                                        + "T12:00:00-06:00")
                         else:
                             numero_documento_referencia = inv.not_loaded_invoice
                             fecha_emision_referencia = inv.not_loaded_invoice_date.strftime("%Y-%m-%d")
@@ -1457,7 +1463,11 @@ class AccountInvoiceElectronic(models.Model):
             partner_id = vals.get('partner_id')
             move_type = vals.get('move_type')
             partner = partner_id and self.env['res.partner'].browse(partner_id)
-            company = company_id and self.env['res.company'].browse(company_id)
+            # company_id no siempre viene explícito en vals (p.ej. al facturar
+            # desde POS, _create_invoice usa with_company() en vez de pasar la
+            # clave company_id), así que se usa self.env.company como
+            # respaldo para no dejar economic_activity_id vacío.
+            company = self.env['res.company'].browse(company_id) if company_id else self.env.company
             if not vals.get('payment_methods_id') and partner and partner.payment_methods_id:
                 vals['payment_methods_id'] = partner.payment_methods_id.id
             elif not vals.get('payment_methods_id') and partner and not partner.payment_methods_id:
@@ -1465,7 +1475,7 @@ class AccountInvoiceElectronic(models.Model):
             if not vals.get('economic_activity_id'):
                 if move_type in ('in_invoice', 'in_refund') and partner_id:
                     vals['economic_activity_id'] = partner.activity_id.id
-                elif move_type in ('out_invoice', 'out_refund') and company_id:
+                elif move_type in ('out_invoice', 'out_refund'):
                     vals['economic_activity_id'] = company.activity_id.id
             if not vals.get('tipo_documento'):
                 if partner_id and partner.export:
