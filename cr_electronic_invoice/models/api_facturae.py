@@ -353,6 +353,12 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
 
     if inv._name == 'pos.order':
         plazo_credito = '0'
+        # En una Nota de Crédito (orden de devolución) el total y todas las
+        # líneas de pago vienen en negativo -no representan vuelto, sino el
+        # monto que se está devolviendo por cada medio de pago-. El resto de
+        # la NC (cantidades, montos de línea) ya se calcula con abs(), así
+        # que aquí se hace lo mismo para no perder los medios de pago.
+        is_refund = inv.amount_total < 0
         for payment in inv.payment_ids:
             # En caso que no tenga código definido se colocará el de efectivo para evitar rechazos de documentos
             if not payment.payment_method_id.sequence:
@@ -365,31 +371,41 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                     'codigo': key,
                     'monto': 0.0,
                 }
-            # Se conserva el signo: el vuelto se registra en Odoo POS como un
-            # pago negativo (normalmente en Efectivo). Si se usara abs() aquí,
-            # el vuelto se sumaría como un pago adicional en lugar de restarse,
-            # y la suma de los medios de pago ya no cuadraría con
-            # TotalComprobante (Hacienda rechaza con el error -493).
-            payment_methods_id[key]['monto'] += round(payment.amount, 5)
+            if is_refund:
+                payment_methods_id[key]['monto'] += abs(round(payment.amount, 5))
+            else:
+                # Se conserva el signo: el vuelto se registra en Odoo POS como un
+                # pago negativo (normalmente en Efectivo). Si se usara abs() aquí,
+                # el vuelto se sumaría como un pago adicional en lugar de restarse,
+                # y la suma de los medios de pago ya no cuadraría con
+                # TotalComprobante (Hacienda rechaza con el error -493).
+                payment_methods_id[key]['monto'] += round(payment.amount, 5)
 
-        # El vuelto queda como un monto negativo (o en 0) en el medio de pago
-        # donde se entregó. Hacienda no acepta medios de pago con monto <= 0,
-        # así que ese vuelto se resta de los medios de pago con monto positivo
-        # (normalmente el medio con el que se pagó de más) hasta agotarlo, y
-        # se descartan los medios que queden en cero.
-        change_total = 0.0
-        for key in list(payment_methods_id.keys()):
-            if payment_methods_id[key]['monto'] <= 0:
-                change_total += -payment_methods_id[key]['monto']
-                del payment_methods_id[key]
-        for key in list(payment_methods_id.keys()):
-            if change_total <= 0:
-                break
-            reduction = min(change_total, payment_methods_id[key]['monto'])
-            payment_methods_id[key]['monto'] = round(payment_methods_id[key]['monto'] - reduction, 5)
-            change_total = round(change_total - reduction, 5)
-            if payment_methods_id[key]['monto'] <= 0:
-                del payment_methods_id[key]
+        if not is_refund:
+            # El vuelto queda como un monto negativo (o en 0) en el medio de pago
+            # donde se entregó. Hacienda no acepta medios de pago con monto <= 0,
+            # así que ese vuelto se resta de los medios de pago con monto positivo
+            # (normalmente el medio con el que se pagó de más) hasta agotarlo, y
+            # se descartan los medios que queden en cero.
+            change_total = 0.0
+            for key in list(payment_methods_id.keys()):
+                if payment_methods_id[key]['monto'] <= 0:
+                    change_total += -payment_methods_id[key]['monto']
+                    del payment_methods_id[key]
+            for key in list(payment_methods_id.keys()):
+                if change_total <= 0:
+                    break
+                reduction = min(change_total, payment_methods_id[key]['monto'])
+                payment_methods_id[key]['monto'] = round(payment_methods_id[key]['monto'] - reduction, 5)
+                change_total = round(change_total - reduction, 5)
+                if payment_methods_id[key]['monto'] <= 0:
+                    del payment_methods_id[key]
+        else:
+            # Sin concepto de vuelto en una devolución: solo se descartan
+            # medios de pago que quedaron en cero.
+            for key in list(payment_methods_id.keys()):
+                if payment_methods_id[key]['monto'] <= 0:
+                    del payment_methods_id[key]
 
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
