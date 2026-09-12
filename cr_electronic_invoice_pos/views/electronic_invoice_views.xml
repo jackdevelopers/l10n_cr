@@ -284,6 +284,15 @@
                             <div style="text-align:center">
                                 Res DGT-R-033-2019 del 20 / 06 / 2019
                             </div>
+
+                            <div class="row mt32" name="invoice_terms"
+                                 t-if="not is_html_empty(o.company_id.invoice_terms) and o.company_id.terms_type == 'plain'">
+                                <div class="col-12">
+                                    <hr/>
+                                    <span t-field="o.company_id.invoice_terms"/>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                 </t>
