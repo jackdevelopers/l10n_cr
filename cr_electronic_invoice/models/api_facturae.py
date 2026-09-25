@@ -11,7 +11,9 @@ import pytz
 import time
 import phonenumbers
 import random
+import threading
 from cryptography import x509
+from markupsafe import Markup
 from cryptography.hazmat.backends import default_backend
 
 from odoo import _
@@ -839,20 +841,171 @@ def send_xml_fe(inv, token, date, xml, tipo_ambiente):
         raise Warning(_('Error enviando el XML al Ministerior de Hacienda'))
 
 
-def schema_validator(xml_file, xsd_file) -> bool:
-    """ verifies a xml
-    :param xml_invoice: Invoice xml
-    :param  xsd_file: XSD File Name
-    :return:
+XSD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'xsd-4.4')
+
+XSD_FILES = {
+    'FE': 'FacturaElectronica_V4.4.xsd',
+    'ND': 'NotaDebitoElectronica_V4.4.xsd',
+    'NC': 'NotaCreditoElectronica_V4.4.xsd',
+    'TE': 'TiqueteElectronico_V4.4.xsd',
+    'FEC': 'FacturaElectronicaCompra_V4.4.xsd',
+    'FEE': 'FacturaElectronicaExportacion_V4.4.xsd',
+    'REP': 'ReciboElectronicoPago_V4.4.xsd',
+    'CCE': 'MensajeReceptor_V4.4.xsd',
+    'CPCE': 'MensajeReceptor_V4.4.xsd',
+    'RCE': 'MensajeReceptor_V4.4.xsd',
+}
+
+XSD_MAX_ERRORS = 20
+
+_xsd_schemas = {}
+# XMLSchema guarda el error_log en la instancia, por lo que no se puede usar
+# el mismo esquema en dos hilos a la vez.
+_xsd_lock = threading.Lock()
+
+
+class _LocalXmldsigResolver(etree.Resolver):
+    """Los XSD de Hacienda importan xmldsig con una ruta relativa a su servidor
+    ("../../xmldsig-core-schema.xsd"); se redirige a la copia local del módulo."""
+
+    def resolve(self, url, pubid, context):
+        if url and url.endswith('xmldsig-core-schema.xsd'):
+            return self.resolve_filename(os.path.join(XSD_DIR, 'xmldsig-core-schema.xsd'), context)
+        return None
+
+
+def _get_xsd_schema(xsd_file):
+    schema = _xsd_schemas.get(xsd_file)
+    if schema is None:
+        parser = etree.XMLParser(no_network=True)
+        parser.resolvers.add(_LocalXmldsigResolver())
+        schema = etree.XMLSchema(etree.parse(os.path.join(XSD_DIR, xsd_file), parser))
+        _xsd_schemas[xsd_file] = schema
+    return schema
+
+
+def validate_xml_xsd(xml, tipo_documento):
+    """Valida el XML firmado contra el XSD v4.4 de Hacienda.
+
+    :param xml: XML firmado (bytes o str)
+    :param tipo_documento: FE, NC, ND, TE, FEC, FEE, REP, CCE, CPCE o RCE
+    :return: lista de errores legibles; vacía si el XML es válido o si no se pudo validar
     """
+    xsd_file = XSD_FILES.get(tipo_documento)
+    if not xsd_file:
+        return []
+    if isinstance(xml, str):
+        xml = xml.encode('utf-8')
 
-    xmlschema = etree.XMLSchema(etree.parse(os.path.join(os.path.dirname(__file__), "xsd/" + xsd_file)))
+    try:
+        root = etree.fromstring(xml, etree.XMLParser(no_network=True, resolve_entities=False))
+    except etree.XMLSyntaxError as error:
+        return [_('XML mal formado: %s') % error]
 
-    xml_doc = base64decode(xml_file)
-    root = etree.fromstring(xml_doc, etree.XMLParser(remove_blank_text=True))
-    result = xmlschema.validate(root)
+    with _xsd_lock:
+        try:
+            schema = _get_xsd_schema(xsd_file)
+        except (OSError, etree.XMLSchemaParseError, etree.XMLSyntaxError) as error:
+            # Un problema con el XSD no debe impedir la emisión del comprobante
+            _logger.warning('E-INV CR - No se pudo cargar el XSD %s: %s', xsd_file, error)
+            return []
+        if schema.validate(root):
+            return []
+        log = list(schema.error_log)
 
-    return result
+    errors = []
+    for entry in log[:XSD_MAX_ERRORS]:
+        path = _xsd_readable_path(root, entry.path)
+        message = _xsd_readable_message(entry.message)
+        errors.append('%s: %s' % (path, message) if path else message)
+    if len(log) > XSD_MAX_ERRORS:
+        errors.append(_('... y %s errores más') % (len(log) - XSD_MAX_ERRORS))
+    return errors
+
+
+def _xsd_readable_path(root, path):
+    """Convierte la ruta de lxml ("/*/*[5]/*[3]/*[2]", sin nombres por los
+    namespaces) en una legible: "DetalleServicio/LineaDetalle[3]/CodigoCABYS"."""
+    if not path:
+        return ''
+    try:
+        nodes = root.getroottree().xpath(path)
+    except etree.XPathError:
+        return ''
+    if not nodes or not isinstance(nodes[0], etree._Element):
+        return ''
+    parts = []
+    element = nodes[0]
+    while element is not None and element is not root:
+        name = etree.QName(element).localname
+        parent = element.getparent()
+        same_tag = [e for e in parent if e.tag == element.tag]
+        if len(same_tag) > 1:
+            name += '[%s]' % (same_tag.index(element) + 1)
+        parts.append(name)
+        element = parent
+    return '/'.join(reversed(parts))
+
+
+# Traducción de los mensajes más comunes de libxml2; los demás se muestran tal cual
+_XSD_MESSAGES = [
+    (r"Element '(\w+)': This element is not expected\. Expected is one of \( (.*) \)\.",
+     "El elemento '{0}' no va en esta posición. Se esperaba uno de: {1}."),
+    (r"Element '(\w+)': This element is not expected\. Expected is \( (.*) \)\.",
+     "El elemento '{0}' no va en esta posición. Se esperaba: {1}."),
+    (r"Element '(\w+)': This element is not expected\.",
+     "El elemento '{0}' no está permitido en esta posición."),
+    (r"Element '(\w+)': Missing child element\(s\)\. Expected is one of \( (.*) \)\.",
+     "Al elemento '{0}' le falta uno de: {1}."),
+    (r"Element '(\w+)': Missing child element\(s\)\. Expected is \( (.*) \)\.",
+     "Al elemento '{0}' le falta: {1}."),
+    (r"Element '(\w+)': \[facet 'maxLength'\] The value has a length of '(\d+)'; "
+     r"this exceeds the allowed maximum length of '(\d+)'\.",
+     "'{0}' tiene {1} caracteres y el máximo permitido es {2}."),
+    (r"Element '(\w+)': \[facet 'minLength'\] The value has a length of '(\d+)'; "
+     r"this underruns the allowed minimum length of '(\d+)'\.",
+     "'{0}' tiene {1} caracteres y el mínimo requerido es {2}."),
+    (r"Element '(\w+)': \[facet 'length'\] The value has a length of '(\d+)'; "
+     r"this differs from the allowed length of '(\d+)'\.",
+     "'{0}' tiene {1} caracteres y debe tener exactamente {2}."),
+    (r"Element '(\w+)': \[facet 'pattern'\] The value '(.*)' is not accepted by the pattern '(.*)'\.",
+     "'{0}' tiene un formato inválido: '{1}'."),
+    (r"Element '(\w+)': \[facet 'enumeration'\] The value '(.*)' is not an element of the set \{(.*)\}\.",
+     "'{0}' tiene un valor no permitido: '{1}'. Valores válidos: {2}."),
+    (r"Element '(\w+)': \[facet 'totalDigits'\] The value '(.*)' has more digits than are allowed \('(\d+)'\)\.",
+     "'{0}' tiene demasiados dígitos: '{1}' (máximo {2})."),
+    (r"Element '(\w+)': \[facet 'fractionDigits'\] The value '(.*)' has more fractional digits "
+     r"than are allowed \('(\d+)'\)\.",
+     "'{0}' tiene demasiados decimales: '{1}' (máximo {2})."),
+    (r"Element '(\w+)': \[facet 'minInclusive'\] The value '(.*)' is less than the minimum value allowed \('(.*)'\)\.",
+     "'{0}' es menor al mínimo permitido: '{1}' (mínimo {2})."),
+    (r"Element '(\w+)': \[facet 'maxInclusive'\] The value '(.*)' is greater than the maximum value "
+     r"allowed \('(.*)'\)\.",
+     "'{0}' es mayor al máximo permitido: '{1}' (máximo {2})."),
+    (r"Element '(\w+)': '(.*)' is not a valid value of the (?:atomic|local atomic) type '(.*)'\.",
+     "'{0}' tiene un valor inválido: '{1}'."),
+]
+
+
+def _xsd_readable_message(message):
+    # Quita los namespaces "{https://cdn.comprobanteselectronicos...}" del mensaje
+    message = re.sub(r'\{https?://[^}]*\}', '', message).strip()
+    for pattern, translation in _XSD_MESSAGES:
+        match = re.fullmatch(pattern, message, re.DOTALL)
+        if match:
+            # Catálogos como UnidadMedida tienen cientos de valores
+            groups = [g if len(g) <= 150 else g[:150] + '...' for g in match.groups()]
+            return translation.format(*groups)
+    return message
+
+
+def xsd_errors_to_html(errors):
+    """Mensaje para el chatter con los errores de validación del XSD."""
+    items = Markup('').join(Markup('<li>%s</li>') % error for error in errors)
+    return Markup('<p><b>%s</b></p><p>%s</p><ul>%s</ul>') % (
+        _('El comprobante no se envió a Hacienda porque el XML no cumple el esquema XSD v4.4.'),
+        _('Corrija los datos indicados y vuelva a enviar el documento.'),
+        items)
 
 
 # Obtener Attachments para las Facturas Electrónicas

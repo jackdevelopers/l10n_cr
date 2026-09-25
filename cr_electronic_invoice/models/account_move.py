@@ -98,6 +98,7 @@ class AccountInvoiceElectronic(models.Model):
             ('recibido', 'Recibido'),
             ('firma_invalida', 'Firma Inválida'),
             ('error', 'Error'),
+            ('error_xsd', 'Error XSD'),
             ('procesando', 'Procesando'),
             ('na', 'No Aplica'),
             ('ne', 'No Encontrado')
@@ -529,7 +530,7 @@ class AccountInvoiceElectronic(models.Model):
              ('state', '=', 'posted'),
              ('xml_supplier_approval', '!=', False),
              ('state_invoice_partner', '!=', False),
-             ('state_tributacion', 'not in', ('aceptado', 'rechazado', 'error', 'na'))],
+             ('state_tributacion', 'not in', ('aceptado', 'rechazado', 'error', 'error_xsd', 'na'))],
             limit=max_invoices)
         total_invoices = len(invoices)
         current_invoice = 0
@@ -542,6 +543,26 @@ class AccountInvoiceElectronic(models.Model):
             _logger.info('_check_hacienda_for_mrs - Invoice %s / %s  -  number:%s',
                          current_invoice, total_invoices, inv.number_electronic)
             inv.send_mrs_to_hacienda()
+
+    def _post_xsd_errors(self, xml_firmado, tipo_documento, filename):
+        """Valida el XML firmado contra el XSD de Hacienda. Si no es válido,
+        informa los errores en el chatter (adjuntando el XML) y deja el documento
+        en estado 'error_xsd'.
+
+        :return: True si el XML tiene errores y no debe enviarse
+        """
+        self.ensure_one()
+        errors = api_facturae.validate_xml_xsd(xml_firmado, tipo_documento)
+        if not errors:
+            return False
+        self.state_tributacion = 'error_xsd'
+        self.message_post(
+            subject=_('Error XSD'),
+            body=api_facturae.xsd_errors_to_html(errors),
+            attachments=[(filename, xml_firmado)])
+        _logger.warning('E-INV CR - %s %s no cumple el XSD: %s',
+                        tipo_documento, self.number_electronic, errors)
+        return True
 
     @api.model
     def _check_hacienda_for_invoices(self, max_invoices=10):
@@ -818,6 +839,10 @@ class AccountInvoiceElectronic(models.Model):
                                 inv.company_id.signature,
                                 inv.company_id.frm_pin, xml)
 
+                            if inv._post_xsd_errors(xml_firmado, tipo_documento_aceptacion,
+                                                    tipo_documento_aceptacion + '_' + inv.number_electronic + '.xml'):
+                                continue
+
                             inv.fname_xml_comprobante = tipo_documento_aceptacion + '_' + inv.number_electronic + '.xml'
                             self.env['ir.attachment'].sudo().create({'name': inv.fname_xml_comprobante,
                                                                      'type': 'binary',
@@ -998,7 +1023,9 @@ class AccountInvoiceElectronic(models.Model):
                 _logger.debug('generate_and_send_invoices - Invoice %s / %s  -  number:%s',
                               current_invoice, total_invoices, inv.name)
 
-                if not inv.xml_comprobante or (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
+                # error_xsd: un FEC rechazado conserva el XML anterior, hay que regenerarlo
+                if not inv.xml_comprobante or inv.state_tributacion == 'error_xsd' or \
+                        (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
                     if inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado':
                         msg_body = _('Another FEC is being sent because the previous one was rejected by Hacienda. ')
                         msg_body += _('Attached the previous XMLs. Previous key: ')
@@ -1392,6 +1419,12 @@ class AccountInvoiceElectronic(models.Model):
                         inv.company_id.signature,
                         inv.company_id.frm_pin,
                         xml_to_sign)
+
+                    # No se guarda el XML si no cumple el XSD, para que se regenere
+                    # al reenviar una vez corregidos los datos
+                    if inv._post_xsd_errors(xml_firmado, inv.tipo_documento,
+                                            inv.tipo_documento + '_' + inv.number_electronic + '.xml'):
+                        continue
 
                     # inv.xml_comprobante = base64.b64encode(xml_firmado)
                     inv.fname_xml_comprobante = inv.tipo_documento + '_' + inv.number_electronic + '.xml'
