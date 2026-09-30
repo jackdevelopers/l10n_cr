@@ -716,18 +716,21 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         sb.append('<TotalExonerado>' + str(round(totalServExonerado + totalMercExonerada, 5)) + '</TotalExonerado>')
         sb.append('<TotalNoSujeto>' + str(round(total_servicio_no_sujeto + total_mercaderia_no_sujeto, 5)) + '</TotalNoSujeto>')
 
-    sb.append('<TotalVenta>' +
-              str(round(total_servicio_gravado +
+    total_venta = round(total_servicio_gravado +
                         total_mercaderia_gravado +
                         total_servicio_exento +
                         total_servicio_no_sujeto+
                         total_mercaderia_exento +
                         total_mercaderia_no_sujeto+
                         totalServExonerado +
-                        totalMercExonerada, 5)) +
-              '</TotalVenta>')
-    sb.append('<TotalDescuentos>' + str(round(total_descuento, 5)) + '</TotalDescuentos>')
-    sb.append('<TotalVentaNeta>' + str(round(base_total, 5)) + '</TotalVentaNeta>')
+                        totalMercExonerada, 5)
+    total_descuento_r = round(total_descuento, 5)
+    # Hacienda (-53) exige TotalVentaNeta == TotalVenta - TotalDescuentos a 5 decimales;
+    # base_total acumulado por líneas puede diferir 1e-5 por redondeo.
+    total_venta_neta = round(total_venta - total_descuento_r, 5)
+    sb.append('<TotalVenta>' + str(total_venta) + '</TotalVenta>')
+    sb.append('<TotalDescuentos>' + str(total_descuento_r) + '</TotalDescuentos>')
+    sb.append('<TotalVentaNeta>' + str(total_venta_neta) + '</TotalVentaNeta>')
     if tax_desgloss:
         for (tax_code, code_iva)  in tax_desgloss:
             sb.append('<TotalDesgloseImpuesto>')
@@ -749,7 +752,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         sb.append('</MedioPago>')
 
     sb.append('<TotalComprobante>' +
-              str(round(base_total + total_impuestos + totalOtrosCargos - total_iva_devuelto, 5)) +
+              str(round(total_venta_neta + total_impuestos + totalOtrosCargos - total_iva_devuelto, 5)) +
               '</TotalComprobante>')
 
     sb.append('</ResumenFactura>')
