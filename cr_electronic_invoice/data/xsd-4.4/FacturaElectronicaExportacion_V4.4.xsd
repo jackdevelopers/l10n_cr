@@ -2477,6 +2477,16 @@ Además, cuando se seleccione el código 04, 08, 09 y 10 de la nota 16 en “Tip
 					<xs:documentation>Nota de Débito a Factura Electrónica de Compra</xs:documentation>
 				</xs:annotation>
 			</xs:enumeration>
+			<xs:enumeration value="19">
+				<xs:annotation>
+					<xs:documentation>Factura electrónica de exportación</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+			<xs:enumeration value="20">
+				<xs:annotation>
+					<xs:documentation>Recibo electrónico de pago</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
 		</xs:restriction>
 	</xs:simpleType>
 	<xs:simpleType name="CodigoReferenciaType">
@@ -2541,6 +2551,31 @@ Además, cuando se seleccione el código 04, 08, 09 y 10 de la nota 16 en “Tip
 			<xs:enumeration value="99">
 				<xs:annotation>
 					<xs:documentation>Otros</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+			<xs:enumeration value="13">
+				<xs:annotation>
+					<xs:documentation>Anula documento de referencia por error material</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+			<xs:enumeration value="14">
+				<xs:annotation>
+					<xs:documentation>Corrige monto por error material</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+			<xs:enumeration value="15">
+				<xs:annotation>
+					<xs:documentation>Sustituye comprobante electrónico por error material</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+			<xs:enumeration value="16">
+				<xs:annotation>
+					<xs:documentation>Sustituye comprobante electrónico rechazado</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+			<xs:enumeration value="17">
+				<xs:annotation>
+					<xs:documentation>Pago a comprobante electrónico</xs:documentation>
 				</xs:annotation>
 			</xs:enumeration>
 		</xs:restriction>

@@ -586,6 +586,19 @@ class AccountInvoiceElectronic(models.Model):
                 'corrige (InformacionReferencia). Si la nota se creó duplicando otra, genere la nota de crédito '
                 'desde la factura original (botón «Nota de crédito») o indique la factura de referencia.'))
 
+        # Anexo 4.4 (ajuste 22/04/2026, obligatorio desde 01/11/2026), nota 9: el código 17 es de uso
+        # exclusivo del Recibo Electrónico de Pago y los códigos 13 y 14 (error material) solo aplican
+        # en notas de crédito o débito, que son las que modifican un comprobante ya emitido
+        code = self.reference_code_id.code
+        if code == '17':
+            errors.append(_(
+                'El código de referencia 17 «Pago a comprobante electrónico» es de uso exclusivo del Recibo '
+                'Electrónico de Pago. Seleccione otro código de referencia.'))
+        elif code in ('13', '14') and self.tipo_documento not in ('NC', 'ND'):
+            errors.append(_(
+                'Los códigos de referencia 13 y 14 (error material) solo se pueden usar en notas de crédito '
+                'o débito.'))
+
         # -409: Hacienda no admite "Extranjero No Domiciliado" (05) en una Factura Electrónica
         partner = self.partner_id
         if self.tipo_documento == 'FE' and partner.vat and partner.identification_id.code == '05':
@@ -1660,7 +1673,7 @@ class AccountInvoiceElectronic(models.Model):
                     raise UserError(_('Please complete the electronic invoice information in the company profile'))
 
             if inv.partner_id and inv.partner_id.vat:
-                identificacion = re.sub('[^0-9]', '', inv.partner_id.vat)
+                identificacion = api_facturae.clean_identification(inv.partner_id.vat, inv.partner_id.identification_id.code)
                 id_code = inv.partner_id.identification_id and inv.partner_id.identification_id.code
                 if not id_code:
                     if len(identificacion) == 9:

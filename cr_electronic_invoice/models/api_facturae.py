@@ -34,6 +34,23 @@ except(ImportError, IOError) as err:
 _logger = logging.getLogger(__name__)
 
 
+def clean_identification(vat, id_code=None):
+    """Normaliza el número de identificación para Hacienda.
+
+    Desde los ajustes al Anexo 4.4 (abril 2026) las cédulas jurídicas (tipo 02) pueden ser
+    alfanuméricas (Decreto 44648-MJ), por lo que ahí se conservan las letras; en los demás
+    tipos solo se conservan los dígitos."""
+    vat = vat or ''
+    if id_code == '02':
+        return re.sub('[^0-9A-Za-z]', '', vat).upper()
+    return re.sub('[^0-9]', '', vat)
+
+
+def valid_juridica_length(number):
+    """Cédula jurídica: 10 dígitos o, si es alfanumérica, 6 caracteres (Decreto 44648-MJ)."""
+    return len(number) == 10 if number.isdigit() else len(number) == 6
+
+
 def sign_xml(cert, password, xml, policy_id='https://www.hacienda.go.cr/ATV/ComprobanteElectronico/docs/esquemas/'
              '2016/v4.2/ResolucionComprobantesElectronicosDGT-R-48-2016_4.2.pdf'):
     root = etree.fromstring(xml)
@@ -129,13 +146,13 @@ def get_clave_hacienda(doc, tipo_documento, consecutivo, sucursal_id, terminal_i
         raise UserError(_('Seleccione el tipo de identificación del emisor en el pérfil de la compañía'))
 
     # Obtenemos el número de identificación del Emisor y lo validamos númericamente
-    inv_cedula = re.sub('[^0-9]', '', doc.company_id.vat)
+    inv_cedula = clean_identification(doc.company_id.vat, doc.company_id.identification_id.code)
 
     # Validamos el largo de la cadena númerica de la cédula del emisor
     if doc.company_id.identification_id.code == '01' and len(inv_cedula) != 9:
         raise UserError(_('La Cédula Física del emisor debe de tener 9 dígitos'))
-    elif doc.company_id.identification_id.code == '02' and len(inv_cedula) != 10:
-        raise UserError(_('La Cédula Jurídica del emisor debe de tener 10 dígitos'))
+    elif doc.company_id.identification_id.code == '02' and not valid_juridica_length(inv_cedula):
+        raise UserError(_('La Cédula Jurídica del emisor debe de tener 10 dígitos (o 6 caracteres si es alfanumérica)'))
     elif doc.company_id.identification_id.code == '03' and len(inv_cedula) not in (11, 12):
         raise UserError(_('La identificación DIMEX del emisor debe de tener 11 o 12 dígitos'))
     elif doc.company_id.identification_id.code == '04' and len(inv_cedula) != 10:
@@ -483,7 +500,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     if inv.tipo_documento == 'TE' or (inv.tipo_documento == 'NC' and not receiver_company.vat):
         pass
     else:
-        vat = re.sub('[^0-9]', '', receiver_company.vat)
+        vat = clean_identification(receiver_company.vat, receiver_company.identification_id.code)
         if not receiver_company.identification_id:
             if len(vat) == 9:  # cedula fisica
                 id_code = '01'
@@ -1257,7 +1274,7 @@ def consulta_documentos(self, inv, env, token_m_h, date_cr, xml_firmado):
 def send_message(inv, date_cr, xml, token, env):
     endpoint = fe_enums.UrlHaciendaRecepcion[env]
 
-    vat = re.sub('[^0-9]', '', inv.partner_id.vat)
+    vat = clean_identification(inv.partner_id.vat, inv.partner_id.identification_id.code)
     xml_base64 = string_to_base64(xml)
 
     comprobante = {'clave': inv.number_electronic,

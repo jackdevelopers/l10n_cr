@@ -21,6 +21,7 @@ class AccountMoveReversal(models.TransientModel):
             return {**default_values}
         # R1705(no-else-return)
         tipo_doc = False
+        reference_code = self.reference_code_id
         type_override = False
         if move.state_tributacion == 'rechazado':
             tipo_doc = 'disabled'
@@ -77,7 +78,7 @@ class AccountMoveReversal(models.TransientModel):
 
         fe_values = {'invoice_id': move.id,
                      'tipo_documento': tipo_doc,
-                     'reference_code_id': self.reference_code_id.id,
+                     'reference_code_id': reference_code.id,
                      'reference_document_id': self.reference_document_id.id,
                      'reference_currency_rate': currency_rate,
                      'economic_activity_id': move.economic_activity_id.id,

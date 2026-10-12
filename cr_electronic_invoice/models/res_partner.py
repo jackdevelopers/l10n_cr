@@ -127,16 +127,20 @@ class PartnerElectronic(models.Model):
                 if len(self.vat) == 0 or len(self.vat) > 20:
                     raise UserError(_('La identificación debe tener menos de 20 carateres.'))
             else:
-                # Remove leters, dashes, dots or any other special character.
-                self.vat = re.sub(r"[^0-9]+", "", self.vat)
+                # Quita letras, guiones, puntos y otros caracteres especiales. La cédula jurídica
+                # (02) puede ser alfanumérica desde el Anexo 4.4 de abril 2026 (Decreto 44648-MJ).
+                if self.identification_id.code == '02':
+                    self.vat = re.sub(r"[^0-9A-Za-z]+", "", self.vat).upper()
+                else:
+                    self.vat = re.sub(r"[^0-9]+", "", self.vat)
                 if self.identification_id.code == '01':
                     if self.vat.isdigit() and len(self.vat) != 9:
                         raise UserError(_('La identificación tipo Cédula física debe ' +
                                         'de contener 9 dígitos, sin cero al inicio y sin guiones.'))
                 elif self.identification_id.code == '02':
-                    if self.vat.isdigit() and len(self.vat) != 10:
+                    if (self.vat.isdigit() and len(self.vat) != 10) or (not self.vat.isdigit() and len(self.vat) != 6):
                         raise UserError(_('La identificación tipo Cédula jurídica debe contener 10 ' +
-                                          'dígitos, sin cero al inicio y sin guiones.'))
+                                          'dígitos, o 6 caracteres si es alfanumérica, sin guiones.'))
                 elif self.identification_id.code == '03' and self.vat.isdigit():
                     if self.vat.isdigit() and len(self.vat) < 11 or len(self.vat) > 12:
                         raise UserError(_('La identificación tipo DIMEX debe contener 11 o 12 ' +
