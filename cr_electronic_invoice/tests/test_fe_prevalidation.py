@@ -90,3 +90,12 @@ class TestFePrevalidation(AccountTestInvoicingCommon):
         # Corregido el dato, la validación pasa y no marca nada
         move.invoice_line_ids.product_id.cabys_code = '4817106030500'
         self.assertFalse(move._post_prevalidation_errors())
+
+    def test_sent_currency_rate_uses_referenced_xml(self):
+        """Caso NC 39464 de Packlab: la NC debe llevar el TipoCambio enviado en el documento
+        de referencia (-511), no la tasa de la fecha de la factura."""
+        import base64
+        move = self._invoice(self.product_bien)
+        self.assertFalse(move._get_sent_currency_rate(move))
+        move.xml_comprobante = base64.b64encode(b'<R><TipoCambio>457.8</TipoCambio></R>')
+        self.assertEqual(move._get_sent_currency_rate(move), 457.8)

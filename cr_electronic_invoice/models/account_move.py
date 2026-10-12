@@ -544,6 +544,25 @@ class AccountInvoiceElectronic(models.Model):
                          current_invoice, total_invoices, inv.number_electronic)
             inv.send_mrs_to_hacienda()
 
+    def _get_sent_currency_rate(self, referenced_move):
+        """TipoCambio que se envió a Hacienda en el documento de referencia de una NC/ND.
+
+        Hacienda rechaza (-511) si difiere del <TipoCambio> del comprobante referenciado.
+        Ese valor es el que quedó en su XML enviado, que no siempre coincide con la tasa
+        de la fecha de la factura (p. ej. si se emitió días después de su fecha).
+
+        :return: float, o False si el documento no tiene XML o no se puede leer
+        """
+        if referenced_move.xml_comprobante:
+            try:
+                xml = base64.b64decode(referenced_move.xml_comprobante).decode('utf-8', 'replace')
+                found = re.search(r'<TipoCambio>\s*([\d.]+)\s*</TipoCambio>', xml)
+                if found and float(found.group(1)) > 0:
+                    return float(found.group(1))
+            except Exception:  # XML ilegible: se usa la tasa calculada
+                _logger.warning('E-INV CR - no se pudo leer el TipoCambio del XML de %s', referenced_move.id)
+        return False
+
     def _post_xsd_errors(self, xml_firmado, tipo_documento, filename):
         """Valida el XML firmado contra el XSD de Hacienda. Si no es válido,
         informa los errores en el chatter (adjuntando el XML) y deja el documento
@@ -1193,6 +1212,10 @@ class AccountInvoiceElectronic(models.Model):
                             else:
                                 currency_rate = round(currency_obj.rate, 5)
                             currency_rate = round(1.0/currency_rate, 5)
+
+                    # -511: la NC/ND debe llevar el mismo TipoCambio que se envió en el documento de referencia
+                    if inv.invoice_id and currency.name != 'CRC' and not inv.reference_currency_rate:
+                        currency_rate = inv._get_sent_currency_rate(inv.invoice_id) or currency_rate
 
                     # Un reembolso creado desde POS (invoice_origin = nombre de la
                     # orden) nunca trae invoice_id/not_loaded_invoice/reference_code_id/
