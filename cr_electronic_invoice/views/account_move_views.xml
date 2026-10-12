@@ -21,7 +21,7 @@
                 </group>
                 <group attrs="{'invisible':['|', '|', ('move_type','in', ('in_invoice', 'in_refund', 'entry')), ('tipo_documento', 'in', ('disabled', 'FEC')), ('state_tributacion', '!=', 'error_xsd')]}">
                     <div class="alert alert-danger" role="alert" attrs="{'invisible':[('state', 'in', ('draft', 'cancel'))]}">
-                        The document was not sent to Hacienda because its XML does not comply with the XSD schema. Check the errors in the chatter, correct the data and press
+                        The document was not sent to Hacienda because its XML does not comply with the XSD schema or it has data Hacienda would reject. Check the errors in the chatter, correct the data and press
                         <button class="btn btn-primary" name="generate_and_send_invoice" type="object" string="Send Document"/>
                     </div>
                 </group>

@@ -565,6 +565,83 @@ class AccountInvoiceElectronic(models.Model):
         return True
 
     @api.model
+    def _get_einvoice_prevalidation_errors(self):
+        """Datos que Hacienda rechazaría aunque el XML cumpla el XSD.
+
+        Se valida antes de generar y enviar el comprobante, para no gastar la clave
+        en un documento que saldría rechazado.
+
+        :return: lista de errores legibles; vacía si no hay nada que corregir
+        """
+        self.ensure_one()
+        if self.move_type not in ('out_invoice', 'out_refund') or self.tipo_documento in ('FEC', 'disabled'):
+            return []
+        errors = []
+
+        # Una NC debe referenciar el documento que corrige; si se duplicó una NC, el campo no se
+        # copia y el XML sale sin <InformacionReferencia> (error XSD -1 poco claro)
+        if self.tipo_documento == 'NC' and not self.invoice_id and not self.not_loaded_invoice:
+            errors.append(_(
+                'La nota de crédito no tiene factura de referencia. Hacienda exige indicar el documento que '
+                'corrige (InformacionReferencia). Si la nota se creó duplicando otra, genere la nota de crédito '
+                'desde la factura original (botón «Nota de crédito») o indique la factura de referencia.'))
+
+        # -409: Hacienda no admite "Extranjero No Domiciliado" (05) en una Factura Electrónica
+        partner = self.partner_id
+        if self.tipo_documento == 'FE' and partner.vat and partner.identification_id.code == '05':
+            digits = re.sub('[^0-9]', '', partner.vat)
+            if (not partner.country_id or partner.country_id.code == 'CR') and len(digits) in (9, 10, 11, 12):
+                errors.append(_(
+                    'El cliente %(partner)s tiene la identificación %(vat)s de Costa Rica, pero su tipo de '
+                    'identificación es «%(type)s». Hacienda no permite ese tipo en una Factura Electrónica '
+                    '(error -409). Cámbielo a Cédula física, Cédula jurídica o DIMEX.',
+                    partner=partner.display_name, vat=partner.vat,
+                    type=partner.identification_id.name))
+
+        # El CABYS debe tener 13 dígitos (el resumen del XML clasifica Servicio/Mercancía con su primer dígito)
+        iva_devuelto = self.env.ref('cr_electronic_invoice.product_iva_devuelto', raise_if_not_found=False)
+        for inv_line in self.invoice_line_ids.filtered(lambda x: not x.display_type):
+            product = inv_line.product_id
+            if iva_devuelto and product.default_code == iva_devuelto.default_code:
+                continue
+            # -150: el precio unitario de cada línea debe ser mayor a cero
+            if inv_line.price_unit <= 0:
+                errors.append(_(
+                    'Línea «%(line)s»: el precio unitario es %(price)s. Hacienda exige que sea mayor a cero '
+                    '(error -150). Corrija el precio o elimine la línea.',
+                    line=inv_line.name or product.display_name or '-', price=inv_line.price_unit))
+            if not product:
+                continue
+            if product.categ_id.name == 'Otros Cargos':
+                continue
+            cabys = (product.cabys_code or product.categ_id.cabys_code or '').strip()
+            if not cabys:
+                continue  # la falta de CABYS la reporta el envío
+            if not re.fullmatch(r'[1-9]\d{12}', cabys):
+                errors.append(_(
+                    'Línea «%(line)s»: el código CABYS «%(cabys)s» no es válido, debe tener 13 dígitos.',
+                    line=inv_line.name, cabys=cabys))
+                continue
+        return errors
+
+    def _post_prevalidation_errors(self):
+        """Si hay datos que Hacienda rechazaría, lo informa en el chatter y deja el
+        documento en estado 'error_xsd' para revisarlo y reenviarlo.
+
+        :return: True si hay errores y el documento no debe enviarse
+        """
+        self.ensure_one()
+        errors = self._get_einvoice_prevalidation_errors()
+        if not errors:
+            return False
+        self.state_tributacion = 'error_xsd'
+        self.message_post(
+            subject=_('Error de validación previa'),
+            body=api_facturae.prevalidation_errors_to_html(errors))
+        _logger.warning('E-INV CR - %s %s no pasa la validación previa: %s',
+                        self.tipo_documento, self.number_electronic, errors)
+        return True
+
     def _check_hacienda_for_invoices(self, max_invoices=10):
         out_invoices = self.env['account.move'].search(
             [('move_type', 'in', ('out_invoice', 'out_refund')),
@@ -1026,6 +1103,10 @@ class AccountInvoiceElectronic(models.Model):
                 # error_xsd: un FEC rechazado conserva el XML anterior, hay que regenerarlo
                 if not inv.xml_comprobante or inv.state_tributacion == 'error_xsd' or \
                         (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
+                    # Datos que Hacienda rechazaría: se revisan antes de generar y enviar el XML
+                    if inv._post_prevalidation_errors():
+                        continue
+
                     if inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado':
                         msg_body = _('Another FEC is being sent because the previous one was rejected by Hacienda. ')
                         msg_body += _('Attached the previous XMLs. Previous key: ')

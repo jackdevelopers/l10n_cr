@@ -1011,6 +1011,18 @@ def xsd_errors_to_html(errors):
         items)
 
 
+def prevalidation_errors_to_html(errors, hint=None):
+    """Mensaje para el chatter con los datos que Hacienda rechazaría.
+
+    :param hint: cómo continuar tras corregir (por defecto, el botón de reenvío de la factura)
+    """
+    items = Markup('').join(Markup('<li>%s</li>') % error for error in errors)
+    return Markup('<p><b>%s</b></p><p>%s</p><ul>%s</ul>') % (
+        _('El comprobante no se envió a Hacienda porque tiene datos que serían rechazados.'),
+        hint or _('Corrija los datos indicados y use «Reenviar» para continuar.'),
+        items)
+
+
 # Obtener Attachments para las Facturas Electrónicas
 def get_invoice_attachments(invoice, record_id):
     attachments = []
