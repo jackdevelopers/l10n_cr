@@ -1076,7 +1076,8 @@ class AccountInvoiceElectronic(models.Model):
                     if (inv.invoice_id or inv.not_loaded_invoice) and \
                        inv.reference_code_id and inv.reference_document_id:
                         if inv.invoice_id:
-                            if inv.invoice_id.number_electronic and inv.invoice_line_ids[0].product_id:
+                            if inv.invoice_id.number_electronic and inv.invoice_line_ids.filtered(
+                                    lambda l: l.display_type not in ("line_section", "line_note"))[:1].product_id:
                                 numero_documento_referencia = inv.invoice_id.number_electronic
                                 fecha_emision_referencia = inv.invoice_id.date_issuance or inv.invoice_id.invoice_date.strftime("%Y-%m-%d") + "T12:00:00-06:00"
                             else:
