@@ -98,6 +98,7 @@ class AccountInvoiceElectronic(models.Model):
             ('recibido', 'Recibido'),
             ('firma_invalida', 'Firma Inválida'),
             ('error', 'Error'),
+            ('error_xsd', 'Error XSD'),
             ('procesando', 'Procesando'),
             ('na', 'No Aplica'),
             ('ne', 'No Encontrado')
@@ -529,7 +530,7 @@ class AccountInvoiceElectronic(models.Model):
              ('state', '=', 'posted'),
              ('xml_supplier_approval', '!=', False),
              ('state_invoice_partner', '!=', False),
-             ('state_tributacion', 'not in', ('aceptado', 'rechazado', 'error', 'na'))],
+             ('state_tributacion', 'not in', ('aceptado', 'rechazado', 'error', 'error_xsd', 'na'))],
             limit=max_invoices)
         total_invoices = len(invoices)
         current_invoice = 0
@@ -543,7 +544,136 @@ class AccountInvoiceElectronic(models.Model):
                          current_invoice, total_invoices, inv.number_electronic)
             inv.send_mrs_to_hacienda()
 
+    def _get_sent_currency_rate(self, referenced_move):
+        """TipoCambio que se envió a Hacienda en el documento de referencia de una NC/ND.
+
+        Hacienda rechaza (-511) si difiere del <TipoCambio> del comprobante referenciado.
+        Ese valor es el que quedó en su XML enviado, que no siempre coincide con la tasa
+        de la fecha de la factura (p. ej. si se emitió días después de su fecha).
+
+        :return: float, o False si el documento no tiene XML o no se puede leer
+        """
+        if referenced_move.xml_comprobante:
+            try:
+                xml = base64.b64decode(referenced_move.xml_comprobante).decode('utf-8', 'replace')
+                found = re.search(r'<TipoCambio>\s*([\d.]+)\s*</TipoCambio>', xml)
+                if found and float(found.group(1)) > 0:
+                    return float(found.group(1))
+            except Exception:  # XML ilegible: se usa la tasa calculada
+                _logger.warning('E-INV CR - no se pudo leer el TipoCambio del XML de %s', referenced_move.id)
+        return False
+
+    def _post_xsd_errors(self, xml_firmado, tipo_documento, filename):
+        """Valida el XML firmado contra el XSD de Hacienda. Si no es válido,
+        informa los errores en el chatter (adjuntando el XML) y deja el documento
+        en estado 'error_xsd'.
+
+        :return: True si el XML tiene errores y no debe enviarse
+        """
+        self.ensure_one()
+        errors = api_facturae.validate_xml_xsd(xml_firmado, tipo_documento)
+        if not errors:
+            return False
+        self.state_tributacion = 'error_xsd'
+        self.message_post(
+            subject=_('Error XSD'),
+            body=api_facturae.xsd_errors_to_html(errors),
+            attachments=[(filename, xml_firmado)])
+        _logger.warning('E-INV CR - %s %s no cumple el XSD: %s',
+                        tipo_documento, self.number_electronic, errors)
+        return True
+
     @api.model
+    def _get_einvoice_prevalidation_errors(self):
+        """Datos que Hacienda rechazaría aunque el XML cumpla el XSD.
+
+        Se valida antes de generar y enviar el comprobante, para no gastar la clave
+        en un documento que saldría rechazado.
+
+        :return: lista de errores legibles; vacía si no hay nada que corregir
+        """
+        self.ensure_one()
+        if self.move_type not in ('out_invoice', 'out_refund') or self.tipo_documento in ('FEC', 'disabled'):
+            return []
+        errors = []
+
+        # Una NC debe referenciar el documento que corrige; si se duplicó una NC, el campo no se
+        # copia y el XML sale sin <InformacionReferencia> (error XSD -1 poco claro)
+        if self.tipo_documento == 'NC' and not self.invoice_id and not self.not_loaded_invoice:
+            errors.append(_(
+                'La nota de crédito no tiene factura de referencia. Hacienda exige indicar el documento que '
+                'corrige (InformacionReferencia). Si la nota se creó duplicando otra, genere la nota de crédito '
+                'desde la factura original (botón «Nota de crédito») o indique la factura de referencia.'))
+
+        # Anexo 4.4 (ajuste 22/04/2026, obligatorio desde 01/11/2026), nota 9: el código 17 es de uso
+        # exclusivo del Recibo Electrónico de Pago y los códigos 13 y 14 (error material) solo aplican
+        # en notas de crédito o débito, que son las que modifican un comprobante ya emitido
+        code = self.reference_code_id.code
+        if code == '17':
+            errors.append(_(
+                'El código de referencia 17 «Pago a comprobante electrónico» es de uso exclusivo del Recibo '
+                'Electrónico de Pago. Seleccione otro código de referencia.'))
+        elif code in ('13', '14') and self.tipo_documento not in ('NC', 'ND'):
+            errors.append(_(
+                'Los códigos de referencia 13 y 14 (error material) solo se pueden usar en notas de crédito '
+                'o débito.'))
+
+        # -409: Hacienda no admite "Extranjero No Domiciliado" (05) en una Factura Electrónica
+        partner = self.partner_id
+        if self.tipo_documento == 'FE' and partner.vat and partner.identification_id.code == '05':
+            digits = re.sub('[^0-9]', '', partner.vat)
+            if (not partner.country_id or partner.country_id.code == 'CR') and len(digits) in (9, 10, 11, 12):
+                errors.append(_(
+                    'El cliente %(partner)s tiene la identificación %(vat)s de Costa Rica, pero su tipo de '
+                    'identificación es «%(type)s». Hacienda no permite ese tipo en una Factura Electrónica '
+                    '(error -409). Cámbielo a Cédula física, Cédula jurídica o DIMEX.',
+                    partner=partner.display_name, vat=partner.vat,
+                    type=partner.identification_id.name))
+
+        # El CABYS debe tener 13 dígitos (el resumen del XML clasifica Servicio/Mercancía con su primer dígito)
+        iva_devuelto = self.env.ref('cr_electronic_invoice.product_iva_devuelto', raise_if_not_found=False)
+        for inv_line in self.invoice_line_ids.filtered(lambda x: not x.display_type):
+            product = inv_line.product_id
+            if iva_devuelto and product.default_code == iva_devuelto.default_code:
+                continue
+            # -150: el precio unitario de cada línea debe ser mayor a cero
+            if inv_line.price_unit <= 0:
+                errors.append(_(
+                    'Línea «%(line)s»: el precio unitario es %(price)s. Hacienda exige que sea mayor a cero '
+                    '(error -150). Corrija el precio o elimine la línea.',
+                    line=inv_line.name or product.display_name or '-', price=inv_line.price_unit))
+            if not product:
+                continue
+            if product.categ_id.name == 'Otros Cargos':
+                continue
+            cabys = (product.cabys_code or product.categ_id.cabys_code or '').strip()
+            if not cabys:
+                continue  # la falta de CABYS la reporta el envío
+            if not re.fullmatch(r'[1-9]\d{12}', cabys):
+                errors.append(_(
+                    'Línea «%(line)s»: el código CABYS «%(cabys)s» no es válido, debe tener 13 dígitos.',
+                    line=inv_line.name, cabys=cabys))
+                continue
+        return errors
+
+    def _post_prevalidation_errors(self):
+        """Si hay datos que Hacienda rechazaría, lo informa en el chatter y deja el
+        documento en estado 'error_xsd' para revisarlo y reenviarlo.
+
+        :return: True si hay errores y el documento no debe enviarse
+        """
+        self.ensure_one()
+        errors = self._get_einvoice_prevalidation_errors()
+        if not errors:
+            return False
+        self.state_tributacion = 'error_xsd'
+        self.message_post(
+            subject=_('Error de validación previa'),
+            body=api_facturae.prevalidation_errors_to_html(errors))
+        _logger.warning('E-INV CR - %s %s no pasa la validación previa: %s',
+                        self.tipo_documento, self.number_electronic, errors)
+        return True
+
     def _check_hacienda_for_invoices(self, max_invoices=10):
         out_invoices = self.env['account.move'].search(
             [('move_type', 'in', ('out_invoice', 'out_refund')),
@@ -818,6 +948,10 @@ class AccountInvoiceElectronic(models.Model):
                                 inv.company_id.signature,
                                 inv.company_id.frm_pin, xml)
 
+                            if inv._post_xsd_errors(xml_firmado, tipo_documento_aceptacion,
+                                                    tipo_documento_aceptacion + '_' + inv.number_electronic + '.xml'):
+                                continue
+
                             inv.fname_xml_comprobante = tipo_documento_aceptacion + '_' + inv.number_electronic + '.xml'
                             self.env['ir.attachment'].sudo().create({'name': inv.fname_xml_comprobante,
                                                                      'type': 'binary',
@@ -998,7 +1132,13 @@ class AccountInvoiceElectronic(models.Model):
                 _logger.debug('generate_and_send_invoices - Invoice %s / %s  -  number:%s',
                               current_invoice, total_invoices, inv.name)
 
-                if not inv.xml_comprobante or (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
+                # error_xsd: un FEC rechazado conserva el XML anterior, hay que regenerarlo
+                if not inv.xml_comprobante or inv.state_tributacion == 'error_xsd' or \
+                        (inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado'):
+                    # Datos que Hacienda rechazaría: se revisan antes de generar y enviar el XML
+                    if inv._post_prevalidation_errors():
+                        continue
+
                     if inv.tipo_documento == 'FEC' and inv.state_tributacion == 'rechazado':
                         msg_body = _('Another FEC is being sent because the previous one was rejected by Hacienda. ')
                         msg_body += _('Attached the previous XMLs. Previous key: ')
@@ -1072,6 +1212,10 @@ class AccountInvoiceElectronic(models.Model):
                             else:
                                 currency_rate = round(currency_obj.rate, 5)
                             currency_rate = round(1.0/currency_rate, 5)
+
+                    # -511: la NC/ND debe llevar el mismo TipoCambio que se envió en el documento de referencia
+                    if inv.invoice_id and currency.name != 'CRC' and not inv.reference_currency_rate:
+                        currency_rate = inv._get_sent_currency_rate(inv.invoice_id) or currency_rate
 
                     # Un reembolso creado desde POS (invoice_origin = nombre de la
                     # orden) nunca trae invoice_id/not_loaded_invoice/reference_code_id/
@@ -1393,6 +1537,12 @@ class AccountInvoiceElectronic(models.Model):
                         inv.company_id.frm_pin,
                         xml_to_sign)
 
+                    # No se guarda el XML si no cumple el XSD, para que se regenere
+                    # al reenviar una vez corregidos los datos
+                    if inv._post_xsd_errors(xml_firmado, inv.tipo_documento,
+                                            inv.tipo_documento + '_' + inv.number_electronic + '.xml'):
+                        continue
+
                     # inv.xml_comprobante = base64.b64encode(xml_firmado)
                     inv.fname_xml_comprobante = inv.tipo_documento + '_' + inv.number_electronic + '.xml'
                     self.env['ir.attachment'].sudo().create({'name': inv.fname_xml_comprobante,
@@ -1546,7 +1696,7 @@ class AccountInvoiceElectronic(models.Model):
                     raise UserError(_('Please complete the electronic invoice information in the company profile'))
 
             if inv.partner_id and inv.partner_id.vat:
-                identificacion = re.sub('[^0-9]', '', inv.partner_id.vat)
+                identificacion = api_facturae.clean_identification(inv.partner_id.vat, inv.partner_id.identification_id.code)
                 id_code = inv.partner_id.identification_id and inv.partner_id.identification_id.code
                 if not id_code:
                     if len(identificacion) == 9:

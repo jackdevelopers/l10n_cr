@@ -99,6 +99,7 @@ class PosOrder(models.Model):
         ('recibido', 'Received'),
         ('firma_invalida', 'Invalid Sign'),
         ('error', 'Error'),
+        ('error_xsd', 'XSD Error'),
         ('procesando', 'Procesing')
         ], 'FE State', copy=False)
 
@@ -650,6 +651,14 @@ class PosOrder(models.Model):
                 xml_to_sign = str(xml_string_builder)
                 xml_firmado = api_facturae.sign_xml(
                     doc.company_id.signature, doc.company_id.frm_pin, xml_to_sign)
+                xsd_errors = api_facturae.validate_xml_xsd(xml_firmado, doc.tipo_documento)
+                if xsd_errors:
+                    doc.state_tributacion = 'error_xsd'
+                    doc.message_post(
+                        subject=_('Error XSD'),
+                        body=api_facturae.xsd_errors_to_html(xsd_errors),
+                        attachments=[(doc.tipo_documento + '_' + doc_name + '.xml', xml_firmado)])
+                    continue
                 doc.fname_xml_comprobante = doc.tipo_documento + '_' + doc_name + '.xml'
                 doc.xml_comprobante = base64.b64encode(xml_firmado)
                 _logger.info('E-INV CR - SIGNED XML:%s', doc.fname_xml_comprobante)
