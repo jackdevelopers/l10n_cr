@@ -1657,15 +1657,15 @@ class AccountInvoiceElectronic(models.Model):
             if inv.move_type == 'entry' and inv.state == 'posted':
                 continue
             if inv.move_type == 'entry' and inv.state != 'posted':
-                super()._post(soft=False)
+                super(AccountInvoiceElectronic, inv)._post(soft=False)
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.company_id.frm_ws_ambiente == 'disabled':
-                super()._post(soft=False)
+                super(AccountInvoiceElectronic, inv)._post(soft=False)
                 inv.tipo_documento = 'disabled'
                 continue
             if inv.tipo_documento == 'disabled':
-                super()._post(soft=False)
+                super(AccountInvoiceElectronic, inv)._post(soft=False)
                 continue
 
             if inv.partner_id.has_exoneration and inv.partner_id.date_expiration and \
@@ -1735,7 +1735,7 @@ class AccountInvoiceElectronic(models.Model):
                 if tipo_documento and sequence:
                     inv.tipo_documento = tipo_documento
                 else:
-                    super()._post(soft=False)
+                    super(AccountInvoiceElectronic, inv)._post(soft=False)
                     continue
 
             # Calcular si aplica IVA Devuelto
@@ -1761,7 +1761,7 @@ class AccountInvoiceElectronic(models.Model):
                         'quantity': 1,
                     })
 
-            super()._post(soft=False)
+            super(AccountInvoiceElectronic, inv)._post(soft=False)
             if not inv.number_electronic:
                 # if journal doesn't have sucursal use default from company
                 sucursal_id = inv.journal_id.sucursal or self.env.user.company_id.sucursal_MR
@@ -1781,6 +1781,7 @@ class AccountInvoiceElectronic(models.Model):
             if inv.move_type in ('out_invoice', 'out_refund'):
                 inv.name = inv.sequence
             inv.state_tributacion = False
+        return self
 
     def _reverse_move_vals(self, default_values, cancel=True):
         move_vals = super()._reverse_move_vals(default_values, cancel)
