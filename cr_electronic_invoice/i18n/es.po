@@ -2485,3 +2485,12 @@ msgstr ""
 #: model:ir.model,name:cr_electronic_invoice.model_sale_conditions
 msgid "sale.conditions"
 msgstr ""
+
+#. module: cr_electronic_invoice
+#: model_terms:ir.ui.view,arch_db:cr_electronic_invoice.view_move_form_inherit
+msgid ""
+"The document was not sent to Hacienda because its XML does not comply with "
+"the XSD schema. Check the errors in the chatter, correct the data and press"
+msgstr ""
+"El documento no se envió a Hacienda porque su XML no cumple el esquema XSD. "
+"Revise los errores en el chatter, corrija los datos y presione"

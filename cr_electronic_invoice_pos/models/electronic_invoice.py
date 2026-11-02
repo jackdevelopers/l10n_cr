@@ -99,6 +99,7 @@ class PosOrder(models.Model):
         ('recibido', 'Received'),
         ('firma_invalida', 'Invalid Sign'),
         ('error', 'Error'),
+        ('error_xsd', 'XSD Error'),
         ('procesando', 'Procesing')
         ], 'FE State', copy=False)
 
@@ -591,7 +592,7 @@ class PosOrder(models.Model):
                                 }
                     dline["impuesto"] = taxes
                     dline["impuestoNeto"] = _line_tax
-                    codigo = str(line.get("codigoCabys", "")).zfill(13)
+                    codigo = str(dline.get("codigoCabys", "")).zfill(13)
                     if (line.product_id and line.product_id.detailed_type == 'service') or (
                             codigo and int(codigo[0]) > 4):
                         if taxes:
@@ -641,7 +642,7 @@ class PosOrder(models.Model):
                 xml_string_builder = api_facturae.gen_xml_v43(
                     doc, sale_conditions, round(total_servicio_gravado, 5),
                     round(total_servicio_exento, 5), round(total_servicio_no_sujeto, 5), total_servicio_exonerado,
-                    round(total_mercaderia_exento, 5),round(total_mercaderia_gravado, 5), round(total_mercaderia_no_sujeto, 5),
+                    round(total_mercaderia_gravado, 5), round(total_mercaderia_exento, 5), round(total_mercaderia_no_sujeto, 5),
                     total_mercaderia_exonerado, total_otros_cargos, total_iva_devuelto, base_subtotal,
                     total_impuestos, total_descuento, lines,
                     otros_cargos, currency_rate, invoice_comments,
@@ -650,6 +651,14 @@ class PosOrder(models.Model):
                 xml_to_sign = str(xml_string_builder)
                 xml_firmado = api_facturae.sign_xml(
                     doc.company_id.signature, doc.company_id.frm_pin, xml_to_sign)
+                xsd_errors = api_facturae.validate_xml_xsd(xml_firmado, doc.tipo_documento)
+                if xsd_errors:
+                    doc.state_tributacion = 'error_xsd'
+                    doc.message_post(
+                        subject=_('Error XSD'),
+                        body=api_facturae.xsd_errors_to_html(xsd_errors),
+                        attachments=[(doc.tipo_documento + '_' + doc_name + '.xml', xml_firmado)])
+                    continue
                 doc.fname_xml_comprobante = doc.tipo_documento + '_' + doc_name + '.xml'
                 doc.xml_comprobante = base64.b64encode(xml_firmado)
                 _logger.info('E-INV CR - SIGNED XML:%s', doc.fname_xml_comprobante)

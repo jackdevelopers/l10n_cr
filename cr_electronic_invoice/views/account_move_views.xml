@@ -19,6 +19,12 @@
                         <button class="btn btn-primary" name="action_check_hacienda" type="object" string="Consult Document"/>
                     </div>
                 </group>
+                <group attrs="{'invisible':['|', '|', ('move_type','in', ('in_invoice', 'in_refund', 'entry')), ('tipo_documento', 'in', ('disabled', 'FEC')), ('state_tributacion', '!=', 'error_xsd')]}">
+                    <div class="alert alert-danger" role="alert" attrs="{'invisible':[('state', 'in', ('draft', 'cancel'))]}">
+                        The document was not sent to Hacienda because its XML does not comply with the XSD schema or it has data Hacienda would reject. Check the errors in the chatter, correct the data and press
+                        <button class="btn btn-primary" name="generate_and_send_invoice" type="object" string="Send Document"/>
+                    </div>
+                </group>
             </xpath>
 
             <xpath expr="//button[@name='button_draft']" position="after">
@@ -28,7 +34,7 @@
                 <button name="action_check_hacienda" type="object" string="Consultar Hacienda" attrs="{'invisible':['|',('move_type','=','entry'),('state_tributacion','in', ('aceptado', 'rechazado', 'error', 'firma_invalida', 'na', 'ne','',False))]}"/>
             -->
                 <button name="action_send_mrs_to_hacienda" type="object" string="Send Receiver Message" attrs="{'invisible':['|', ('move_type','not in', ('in_invoice', 'in_refund', 'entry')), ('tipo_documento','==','FEC')]}"/>
-                <button name="action_create_fec" type="object" string="Send FEC" attrs="{'invisible':['|', ('tipo_documento','!=','FEC'), ('state_tributacion','not in', (False,'rechazado', 'error'))]}"/>
+                <button name="action_create_fec" type="object" string="Send FEC" attrs="{'invisible':['|', ('tipo_documento','!=','FEC'), ('state_tributacion','not in', (False,'rechazado', 'error', 'error_xsd'))]}"/>
                 <button name="create_partner_from_xml" class="oe_highlight" type="object" string="Create Provider" attrs="{'invisible':['|','|',('move_type','in',('entry', 'out_invoice', 'out_refund')),('partner_id','!=', False),('xml_supplier_approval','=', False)]}"/>
             </xpath>
 
@@ -136,7 +142,7 @@
         <field name="arch" type="xml">
             <tree position="attributes">
                 <attribute name="decoration-danger">
-                    state_tributacion == 'rechazado'
+                    state_tributacion in ('rechazado', 'error_xsd')
                 </attribute>
             </tree>
             <field name="state" position="before">

@@ -11,7 +11,9 @@ import pytz
 import time
 import phonenumbers
 import random
+import threading
 from cryptography import x509
+from markupsafe import Markup
 from cryptography.hazmat.backends import default_backend
 
 from odoo import _
@@ -30,6 +32,23 @@ except(ImportError, IOError) as err:
 # from .. import extensions
 
 _logger = logging.getLogger(__name__)
+
+
+def clean_identification(vat, id_code=None):
+    """Normaliza el número de identificación para Hacienda.
+
+    Desde los ajustes al Anexo 4.4 (abril 2026) las cédulas jurídicas (tipo 02) pueden ser
+    alfanuméricas (Decreto 44648-MJ), por lo que ahí se conservan las letras; en los demás
+    tipos solo se conservan los dígitos."""
+    vat = vat or ''
+    if id_code == '02':
+        return re.sub('[^0-9A-Za-z]', '', vat).upper()
+    return re.sub('[^0-9]', '', vat)
+
+
+def valid_juridica_length(number):
+    """Cédula jurídica: 10 dígitos o, si es alfanumérica, 6 caracteres (Decreto 44648-MJ)."""
+    return len(number) == 10 if number.isdigit() else len(number) == 6
 
 
 def sign_xml(cert, password, xml, policy_id='https://www.hacienda.go.cr/ATV/ComprobanteElectronico/docs/esquemas/'
@@ -127,13 +146,13 @@ def get_clave_hacienda(doc, tipo_documento, consecutivo, sucursal_id, terminal_i
         raise UserError(_('Seleccione el tipo de identificación del emisor en el pérfil de la compañía'))
 
     # Obtenemos el número de identificación del Emisor y lo validamos númericamente
-    inv_cedula = re.sub('[^0-9]', '', doc.company_id.vat)
+    inv_cedula = clean_identification(doc.company_id.vat, doc.company_id.identification_id.code)
 
     # Validamos el largo de la cadena númerica de la cédula del emisor
     if doc.company_id.identification_id.code == '01' and len(inv_cedula) != 9:
         raise UserError(_('La Cédula Física del emisor debe de tener 9 dígitos'))
-    elif doc.company_id.identification_id.code == '02' and len(inv_cedula) != 10:
-        raise UserError(_('La Cédula Jurídica del emisor debe de tener 10 dígitos'))
+    elif doc.company_id.identification_id.code == '02' and not valid_juridica_length(inv_cedula):
+        raise UserError(_('La Cédula Jurídica del emisor debe de tener 10 dígitos (o 6 caracteres si es alfanumérica)'))
     elif doc.company_id.identification_id.code == '03' and len(inv_cedula) not in (11, 12):
         raise UserError(_('La identificación DIMEX del emisor debe de tener 11 o 12 dígitos'))
     elif doc.company_id.identification_id.code == '04' and len(inv_cedula) != 10:
@@ -353,25 +372,60 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
 
     if inv._name == 'pos.order':
         plazo_credito = '0'
+        # En una Nota de Crédito (orden de devolución) el total y todas las
+        # líneas de pago vienen en negativo -no representan vuelto, sino el
+        # monto que se está devolviendo por cada medio de pago-. El resto de
+        # la NC (cantidades, montos de línea) ya se calcula con abs(), así
+        # que aquí se hace lo mismo para no perder los medios de pago.
+        is_refund = inv.amount_total < 0
         for payment in inv.payment_ids:
             # En caso que no tenga código definido se colocará el de efectivo para evitar rechazos de documentos
             if not payment.payment_method_id.sequence:
-                payment_methods_id['01'] = {
-                    'codigo': '01',
-                    'monto': abs(round(payment.amount,5)),
-
-
-                }
+                key = '01'
             else:
                 # Se agrega el campo code en los métodos de pago de Odoo POS
                 key = (str(payment.payment_method_id.sequence))
-                if key not in payment_methods_id:
-                    payment_methods_id[key] = {
-                        'codigo': key,
-                        'monto': 0.0,
+            if key not in payment_methods_id:
+                payment_methods_id[key] = {
+                    'codigo': key,
+                    'monto': 0.0,
+                }
+            if is_refund:
+                payment_methods_id[key]['monto'] += abs(round(payment.amount, 5))
+            else:
+                # Se conserva el signo: el vuelto se registra en Odoo POS como un
+                # pago negativo (normalmente en Efectivo). Si se usara abs() aquí,
+                # el vuelto se sumaría como un pago adicional en lugar de restarse,
+                # y la suma de los medios de pago ya no cuadraría con
+                # TotalComprobante (Hacienda rechaza con el error -493).
+                payment_methods_id[key]['monto'] += round(payment.amount, 5)
 
-                    }
-                payment_methods_id[key]['monto'] += abs(round(payment.amount,5))
+        if not is_refund:
+            # El vuelto queda como un monto negativo (o en 0) en el medio de pago
+            # donde se entregó. Hacienda no acepta medios de pago con monto <= 0,
+            # así que ese vuelto se resta de los medios de pago con monto positivo
+            # (normalmente el medio con el que se pagó de más) hasta agotarlo, y
+            # se descartan los medios que queden en cero.
+            change_total = 0.0
+            for key in list(payment_methods_id.keys()):
+                if payment_methods_id[key]['monto'] <= 0:
+                    change_total += -payment_methods_id[key]['monto']
+                    del payment_methods_id[key]
+            for key in list(payment_methods_id.keys()):
+                if change_total <= 0:
+                    break
+                reduction = min(change_total, payment_methods_id[key]['monto'])
+                payment_methods_id[key]['monto'] = round(payment_methods_id[key]['monto'] - reduction, 5)
+                change_total = round(change_total - reduction, 5)
+                if payment_methods_id[key]['monto'] <= 0:
+                    del payment_methods_id[key]
+        else:
+            # Sin concepto de vuelto en una devolución: solo se descartan
+            # medios de pago que quedaron en cero.
+            for key in list(payment_methods_id.keys()):
+                if payment_methods_id[key]['monto'] <= 0:
+                    del payment_methods_id[key]
+
         cod_moneda = str(inv.company_id.currency_id.name)
         invoice_ref = False
     else:
@@ -446,7 +500,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
     if inv.tipo_documento == 'TE' or (inv.tipo_documento == 'NC' and not receiver_company.vat):
         pass
     else:
-        vat = re.sub('[^0-9]', '', receiver_company.vat)
+        vat = clean_identification(receiver_company.vat, receiver_company.identification_id.code)
         if not receiver_company.identification_id:
             if len(vat) == 9:  # cedula fisica
                 id_code = '01'
@@ -558,67 +612,69 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
                 else:
                     sb.append('<BaseImponible>' + str(v['subtotal']) + '</BaseImponible>')
 
-                for (a, b) in v['impuesto'].items():
-                    tax_code = str(b['iva_tax_code'])
-                    code_iva = str(b['codigo'])
-                    sb.append('<Impuesto>')
-                    sb.append('<Codigo>' + str(b['codigo']) + '</Codigo>')
-                    if tax_code.isdigit():
-                        sb.append('<CodigoTarifaIVA>' + tax_code + '</CodigoTarifaIVA>')
-                    sb.append('<Tarifa>' + str(b['tarifa']) + '</Tarifa>')
-                    sb.append('<Monto>' + str(b['monto']) + '</Monto>')
+            # El schema v4.4 exige el tag Impuesto en cada línea también para FEE
+            # (documentos de exportación), aunque sea con Tarifa/Monto en 0.
+            for (a, b) in v['impuesto'].items():
+                tax_code = str(b['iva_tax_code'])
+                code_iva = str(b['codigo'])
+                sb.append('<Impuesto>')
+                sb.append('<Codigo>' + str(b['codigo']) + '</Codigo>')
+                if tax_code.isdigit():
+                    sb.append('<CodigoTarifaIVA>' + tax_code + '</CodigoTarifaIVA>')
+                sb.append('<Tarifa>' + str(b['tarifa']) + '</Tarifa>')
+                sb.append('<Monto>' + str(b['monto']) + '</Monto>')
 
-                    if (tax_code, code_iva) in tax_desgloss:
-                        if b.get('exoneracion'):
-                            if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
-                                actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
-                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
-                        else:
+                if (tax_code, code_iva) in tax_desgloss:
+                    if b.get('exoneracion'):
+                        if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
                             actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
                             actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
                             tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
                     else:
-                        if b.get('exoneracion'):
-                            if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
-                                tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
-                        else:
+                        actual_tax_amount = tax_desgloss[(tax_code, code_iva)][1]
+                        actual_tax_amount = float(actual_tax_amount) + float(b['monto'])
+                        tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(actual_tax_amount)]
+                else:
+                    if b.get('exoneracion'):
+                        if float(b['exoneracion']['montoImpuesto']) != float(b['monto']):
                             tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
+                    else:
+                        tax_desgloss[(tax_code, code_iva)] = [str(b['codigo']),str(b['monto'])]
 
-                    if inv.tipo_documento != 'FEE':
-                        if b.get('exoneracion'):
-                            sb.append('<Exoneracion>')
-                            sb.append('<TipoDocumentoEX1>' +
-                                      receiver_company.type_exoneration.code +
-                                      '</TipoDocumentoEX1>')
-                            sb.append('<NumeroDocumento>' +
-                                      receiver_company.exoneration_number +
-                                      '</NumeroDocumento>')
-                            if receiver_company.type_exoneration.code in ('02', '03', '06', '07', '08'):
-                                sb.append('<Articulo>' +
-                                          "696969" +
-                                          '</Articulo>')
-                                sb.append('<Inciso>' +
-                                          "696969" +
-                                          '</Inciso>')
-                            sb.append('<NombreInstitucion>' +
-                                      receiver_company.institution_name +
-                                      '</NombreInstitucion>')
-                            sb.append('<FechaEmisionEX>' +
-                                      str(receiver_company.date_issue) + 'T00:00:00-06:00' +
-                                      '</FechaEmisionEX>')
-                            sb.append('<TarifaExonerada>' +
-                                      str(b['exoneracion']['porcentajeCompra']) +
-                                      '</TarifaExonerada>')
-                            sb.append('<MontoExoneracion>' +
-                                      str(b['exoneracion']['montoImpuesto']) +
-                                      '</MontoExoneracion>')
-                            sb.append('</Exoneracion>')
-                    sb.append('</Impuesto>')
-                if inv.tipo_documento not in ('FEE','FEC', 'REP'):
-                    sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
                 if inv.tipo_documento != 'FEE':
-                    sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
+                    if b.get('exoneracion'):
+                        sb.append('<Exoneracion>')
+                        sb.append('<TipoDocumentoEX1>' +
+                                  receiver_company.type_exoneration.code +
+                                  '</TipoDocumentoEX1>')
+                        sb.append('<NumeroDocumento>' +
+                                  receiver_company.exoneration_number +
+                                  '</NumeroDocumento>')
+                        if receiver_company.type_exoneration.code in ('02', '03', '06', '07', '08'):
+                            sb.append('<Articulo>' +
+                                      "696969" +
+                                      '</Articulo>')
+                            sb.append('<Inciso>' +
+                                      "696969" +
+                                      '</Inciso>')
+                        sb.append('<NombreInstitucion>' +
+                                  receiver_company.institution_name +
+                                  '</NombreInstitucion>')
+                        sb.append('<FechaEmisionEX>' +
+                                  str(receiver_company.date_issue) + 'T00:00:00-06:00' +
+                                  '</FechaEmisionEX>')
+                        sb.append('<TarifaExonerada>' +
+                                  str(b['exoneracion']['porcentajeCompra']) +
+                                  '</TarifaExonerada>')
+                        sb.append('<MontoExoneracion>' +
+                                  str(b['exoneracion']['montoImpuesto']) +
+                                  '</MontoExoneracion>')
+                        sb.append('</Exoneracion>')
+                sb.append('</Impuesto>')
+            if inv.tipo_documento not in ('FEE','FEC', 'REP'):
+                sb.append('<ImpuestoAsumidoEmisorFabrica>' + '0' + '</ImpuestoAsumidoEmisorFabrica>')
+            if inv.tipo_documento != 'FEE':
+                sb.append('<ImpuestoNeto>' + str(v['impuestoNeto']) + '</ImpuestoNeto>')
 
             sb.append('<MontoTotalLinea>' + str(v['montoTotalLinea']) + '</MontoTotalLinea>')
             sb.append('</LineaDetalle>')
@@ -677,18 +733,21 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         sb.append('<TotalExonerado>' + str(round(totalServExonerado + totalMercExonerada, 5)) + '</TotalExonerado>')
         sb.append('<TotalNoSujeto>' + str(round(total_servicio_no_sujeto + total_mercaderia_no_sujeto, 5)) + '</TotalNoSujeto>')
 
-    sb.append('<TotalVenta>' +
-              str(round(total_servicio_gravado +
+    total_venta = round(total_servicio_gravado +
                         total_mercaderia_gravado +
                         total_servicio_exento +
                         total_servicio_no_sujeto+
                         total_mercaderia_exento +
                         total_mercaderia_no_sujeto+
                         totalServExonerado +
-                        totalMercExonerada, 5)) +
-              '</TotalVenta>')
-    sb.append('<TotalDescuentos>' + str(round(total_descuento, 5)) + '</TotalDescuentos>')
-    sb.append('<TotalVentaNeta>' + str(round(base_total, 5)) + '</TotalVentaNeta>')
+                        totalMercExonerada, 5)
+    total_descuento_r = round(total_descuento, 5)
+    # Hacienda (-53) exige TotalVentaNeta == TotalVenta - TotalDescuentos a 5 decimales;
+    # base_total acumulado por líneas puede diferir 1e-5 por redondeo.
+    total_venta_neta = round(total_venta - total_descuento_r, 5)
+    sb.append('<TotalVenta>' + str(total_venta) + '</TotalVenta>')
+    sb.append('<TotalDescuentos>' + str(total_descuento_r) + '</TotalDescuentos>')
+    sb.append('<TotalVentaNeta>' + str(total_venta_neta) + '</TotalVentaNeta>')
     if tax_desgloss:
         for (tax_code, code_iva)  in tax_desgloss:
             sb.append('<TotalDesgloseImpuesto>')
@@ -710,7 +769,7 @@ def gen_xml_v43(inv, sale_conditions, total_servicio_gravado,
         sb.append('</MedioPago>')
 
     sb.append('<TotalComprobante>' +
-              str(round(base_total + total_impuestos + totalOtrosCargos - total_iva_devuelto, 5)) +
+              str(round(total_venta_neta + total_impuestos + totalOtrosCargos - total_iva_devuelto, 5)) +
               '</TotalComprobante>')
 
     sb.append('</ResumenFactura>')
@@ -802,20 +861,183 @@ def send_xml_fe(inv, token, date, xml, tipo_ambiente):
         raise Warning(_('Error enviando el XML al Ministerior de Hacienda'))
 
 
-def schema_validator(xml_file, xsd_file) -> bool:
-    """ verifies a xml
-    :param xml_invoice: Invoice xml
-    :param  xsd_file: XSD File Name
-    :return:
+XSD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'xsd-4.4')
+
+XSD_FILES = {
+    'FE': 'FacturaElectronica_V4.4.xsd',
+    'ND': 'NotaDebitoElectronica_V4.4.xsd',
+    'NC': 'NotaCreditoElectronica_V4.4.xsd',
+    'TE': 'TiqueteElectronico_V4.4.xsd',
+    'FEC': 'FacturaElectronicaCompra_V4.4.xsd',
+    'FEE': 'FacturaElectronicaExportacion_V4.4.xsd',
+    'REP': 'ReciboElectronicoPago_V4.4.xsd',
+    'CCE': 'MensajeReceptor_V4.4.xsd',
+    'CPCE': 'MensajeReceptor_V4.4.xsd',
+    'RCE': 'MensajeReceptor_V4.4.xsd',
+}
+
+XSD_MAX_ERRORS = 20
+
+_xsd_schemas = {}
+# XMLSchema guarda el error_log en la instancia, por lo que no se puede usar
+# el mismo esquema en dos hilos a la vez.
+_xsd_lock = threading.Lock()
+
+
+class _LocalXmldsigResolver(etree.Resolver):
+    """Los XSD de Hacienda importan xmldsig con una ruta relativa a su servidor
+    ("../../xmldsig-core-schema.xsd"); se redirige a la copia local del módulo."""
+
+    def resolve(self, url, pubid, context):
+        if url and url.endswith('xmldsig-core-schema.xsd'):
+            return self.resolve_filename(os.path.join(XSD_DIR, 'xmldsig-core-schema.xsd'), context)
+        return None
+
+
+def _get_xsd_schema(xsd_file):
+    schema = _xsd_schemas.get(xsd_file)
+    if schema is None:
+        parser = etree.XMLParser(no_network=True)
+        parser.resolvers.add(_LocalXmldsigResolver())
+        schema = etree.XMLSchema(etree.parse(os.path.join(XSD_DIR, xsd_file), parser))
+        _xsd_schemas[xsd_file] = schema
+    return schema
+
+
+def validate_xml_xsd(xml, tipo_documento):
+    """Valida el XML firmado contra el XSD v4.4 de Hacienda.
+
+    :param xml: XML firmado (bytes o str)
+    :param tipo_documento: FE, NC, ND, TE, FEC, FEE, REP, CCE, CPCE o RCE
+    :return: lista de errores legibles; vacía si el XML es válido o si no se pudo validar
     """
+    xsd_file = XSD_FILES.get(tipo_documento)
+    if not xsd_file:
+        return []
+    if isinstance(xml, str):
+        xml = xml.encode('utf-8')
 
-    xmlschema = etree.XMLSchema(etree.parse(os.path.join(os.path.dirname(__file__), "xsd/" + xsd_file)))
+    try:
+        root = etree.fromstring(xml, etree.XMLParser(no_network=True, resolve_entities=False))
+    except etree.XMLSyntaxError as error:
+        return [_('XML mal formado: %s') % error]
 
-    xml_doc = base64decode(xml_file)
-    root = etree.fromstring(xml_doc, etree.XMLParser(remove_blank_text=True))
-    result = xmlschema.validate(root)
+    with _xsd_lock:
+        try:
+            schema = _get_xsd_schema(xsd_file)
+        except (OSError, etree.XMLSchemaParseError, etree.XMLSyntaxError) as error:
+            # Un problema con el XSD no debe impedir la emisión del comprobante
+            _logger.warning('E-INV CR - No se pudo cargar el XSD %s: %s', xsd_file, error)
+            return []
+        if schema.validate(root):
+            return []
+        log = list(schema.error_log)
 
-    return result
+    errors = []
+    for entry in log[:XSD_MAX_ERRORS]:
+        path = _xsd_readable_path(root, entry.path)
+        message = _xsd_readable_message(entry.message)
+        errors.append('%s: %s' % (path, message) if path else message)
+    if len(log) > XSD_MAX_ERRORS:
+        errors.append(_('... y %s errores más') % (len(log) - XSD_MAX_ERRORS))
+    return errors
+
+
+def _xsd_readable_path(root, path):
+    """Convierte la ruta de lxml ("/*/*[5]/*[3]/*[2]", sin nombres por los
+    namespaces) en una legible: "DetalleServicio/LineaDetalle[3]/CodigoCABYS"."""
+    if not path:
+        return ''
+    try:
+        nodes = root.getroottree().xpath(path)
+    except etree.XPathError:
+        return ''
+    if not nodes or not isinstance(nodes[0], etree._Element):
+        return ''
+    parts = []
+    element = nodes[0]
+    while element is not None and element is not root:
+        name = etree.QName(element).localname
+        parent = element.getparent()
+        same_tag = [e for e in parent if e.tag == element.tag]
+        if len(same_tag) > 1:
+            name += '[%s]' % (same_tag.index(element) + 1)
+        parts.append(name)
+        element = parent
+    return '/'.join(reversed(parts))
+
+
+# Traducción de los mensajes más comunes de libxml2; los demás se muestran tal cual
+_XSD_MESSAGES = [
+    (r"Element '(\w+)': This element is not expected\. Expected is one of \( (.*) \)\.",
+     "El elemento '{0}' no va en esta posición. Se esperaba uno de: {1}."),
+    (r"Element '(\w+)': This element is not expected\. Expected is \( (.*) \)\.",
+     "El elemento '{0}' no va en esta posición. Se esperaba: {1}."),
+    (r"Element '(\w+)': This element is not expected\.",
+     "El elemento '{0}' no está permitido en esta posición."),
+    (r"Element '(\w+)': Missing child element\(s\)\. Expected is one of \( (.*) \)\.",
+     "Al elemento '{0}' le falta uno de: {1}."),
+    (r"Element '(\w+)': Missing child element\(s\)\. Expected is \( (.*) \)\.",
+     "Al elemento '{0}' le falta: {1}."),
+    (r"Element '(\w+)': \[facet 'maxLength'\] The value has a length of '(\d+)'; "
+     r"this exceeds the allowed maximum length of '(\d+)'\.",
+     "'{0}' tiene {1} caracteres y el máximo permitido es {2}."),
+    (r"Element '(\w+)': \[facet 'minLength'\] The value has a length of '(\d+)'; "
+     r"this underruns the allowed minimum length of '(\d+)'\.",
+     "'{0}' tiene {1} caracteres y el mínimo requerido es {2}."),
+    (r"Element '(\w+)': \[facet 'length'\] The value has a length of '(\d+)'; "
+     r"this differs from the allowed length of '(\d+)'\.",
+     "'{0}' tiene {1} caracteres y debe tener exactamente {2}."),
+    (r"Element '(\w+)': \[facet 'pattern'\] The value '(.*)' is not accepted by the pattern '(.*)'\.",
+     "'{0}' tiene un formato inválido: '{1}'."),
+    (r"Element '(\w+)': \[facet 'enumeration'\] The value '(.*)' is not an element of the set \{(.*)\}\.",
+     "'{0}' tiene un valor no permitido: '{1}'. Valores válidos: {2}."),
+    (r"Element '(\w+)': \[facet 'totalDigits'\] The value '(.*)' has more digits than are allowed \('(\d+)'\)\.",
+     "'{0}' tiene demasiados dígitos: '{1}' (máximo {2})."),
+    (r"Element '(\w+)': \[facet 'fractionDigits'\] The value '(.*)' has more fractional digits "
+     r"than are allowed \('(\d+)'\)\.",
+     "'{0}' tiene demasiados decimales: '{1}' (máximo {2})."),
+    (r"Element '(\w+)': \[facet 'minInclusive'\] The value '(.*)' is less than the minimum value allowed \('(.*)'\)\.",
+     "'{0}' es menor al mínimo permitido: '{1}' (mínimo {2})."),
+    (r"Element '(\w+)': \[facet 'maxInclusive'\] The value '(.*)' is greater than the maximum value "
+     r"allowed \('(.*)'\)\.",
+     "'{0}' es mayor al máximo permitido: '{1}' (máximo {2})."),
+    (r"Element '(\w+)': '(.*)' is not a valid value of the (?:atomic|local atomic) type '(.*)'\.",
+     "'{0}' tiene un valor inválido: '{1}'."),
+]
+
+
+def _xsd_readable_message(message):
+    # Quita los namespaces "{https://cdn.comprobanteselectronicos...}" del mensaje
+    message = re.sub(r'\{https?://[^}]*\}', '', message).strip()
+    for pattern, translation in _XSD_MESSAGES:
+        match = re.fullmatch(pattern, message, re.DOTALL)
+        if match:
+            # Catálogos como UnidadMedida tienen cientos de valores
+            groups = [g if len(g) <= 150 else g[:150] + '...' for g in match.groups()]
+            return translation.format(*groups)
+    return message
+
+
+def xsd_errors_to_html(errors):
+    """Mensaje para el chatter con los errores de validación del XSD."""
+    items = Markup('').join(Markup('<li>%s</li>') % error for error in errors)
+    return Markup('<p><b>%s</b></p><p>%s</p><ul>%s</ul>') % (
+        _('El comprobante no se envió a Hacienda porque el XML no cumple el esquema XSD v4.4.'),
+        _('Corrija los datos indicados y vuelva a enviar el documento.'),
+        items)
+
+
+def prevalidation_errors_to_html(errors, hint=None):
+    """Mensaje para el chatter con los datos que Hacienda rechazaría.
+
+    :param hint: cómo continuar tras corregir (por defecto, el botón de reenvío de la factura)
+    """
+    items = Markup('').join(Markup('<li>%s</li>') % error for error in errors)
+    return Markup('<p><b>%s</b></p><p>%s</p><ul>%s</ul>') % (
+        _('El comprobante no se envió a Hacienda porque tiene datos que serían rechazados.'),
+        hint or _('Corrija los datos indicados y use «Reenviar» para continuar.'),
+        items)
 
 
 # Obtener Attachments para las Facturas Electrónicas
@@ -1052,7 +1274,7 @@ def consulta_documentos(self, inv, env, token_m_h, date_cr, xml_firmado):
 def send_message(inv, date_cr, xml, token, env):
     endpoint = fe_enums.UrlHaciendaRecepcion[env]
 
-    vat = re.sub('[^0-9]', '', inv.partner_id.vat)
+    vat = clean_identification(inv.partner_id.vat, inv.partner_id.identification_id.code)
     xml_base64 = string_to_base64(xml)
 
     comprobante = {'clave': inv.number_electronic,
@@ -1079,6 +1301,18 @@ def send_message(inv, date_cr, xml, token, env):
 
     _logger.error('E-INV CR - ERROR SEND MESSAGE - RESPONSE:%s', response.headers.get('X-Error-Cause', 'Unknown'))
     return {'status': response.status_code, 'text': response.headers.get('X-Error-Cause', 'Unknown')}
+
+
+def is_tax_assumed_by_issuer(line, tax_node, namespaces):
+    """El impuesto específico (código 05) puede venir absorbido por el fabricante/emisor,
+    señalado con el tag ImpuestoAsumidoEmisorFabrica de la línea. En ese caso no debe
+    cargarse como impuesto de la factura de proveedor porque el comprador no lo paga
+    (el monto ni siquiera forma parte del MontoTotalLinea) y tampoco trae Tarifa."""
+    tax_code = re.sub(r"[^0-9]+", "", tax_node.xpath("inv:Codigo", namespaces=namespaces)[0].text)
+    if tax_code != '05':
+        return False
+    assumed_node = line.xpath("inv:ImpuestoAsumidoEmisorFabrica", namespaces=namespaces)
+    return bool(assumed_node and float(assumed_node[0].text or '0') > 0)
 
 
 def load_xml_data(invoice, load_lines, load_product_by_code, create_partner_automatically, create_product_by_code, account_id, product_id=False, analytic_account_id=False):
@@ -1256,6 +1490,8 @@ def load_xml_data(invoice, load_lines, load_product_by_code, create_partner_auto
             taxes = []
             tax_nodes = line.xpath("inv:Impuesto", namespaces=namespaces)
             for tax_node in tax_nodes:
+                if is_tax_assumed_by_issuer(line, tax_node, namespaces):
+                    continue
                 tax_code = re.sub(r"[^0-9]+", "", tax_node.xpath("inv:Codigo", namespaces=namespaces)[0].text)
                 tax_amount = float(tax_node.xpath("inv:Tarifa", namespaces=namespaces)[0].text)
                 _logger.debug('FECR - tax_code: %s', tax_code)
