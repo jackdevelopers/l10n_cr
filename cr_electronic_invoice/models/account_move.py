@@ -649,7 +649,7 @@ class AccountInvoiceElectronic(models.Model):
             cabys = (product.cabys_code or product.categ_id.cabys_code or '').strip()
             if not cabys:
                 continue  # la falta de CABYS la reporta el envío
-            if not re.fullmatch(r'[1-9]\d{12}', cabys):
+            if not re.fullmatch(r'\d{13}', cabys):
                 errors.append(_(
                     'Línea «%(line)s»: el código CABYS «%(cabys)s» no es válido, debe tener 13 dígitos.',
                     line=inv_line.name, cabys=cabys))
